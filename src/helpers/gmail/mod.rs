@@ -14,7 +14,8 @@
 
 use super::Helper;
 pub mod forward;
-pub mod reply;
+pub mod read;
+mod reply;
 pub mod send;
 pub mod triage;
 pub mod watch;
@@ -1007,6 +1008,27 @@ TIPS:
         );
 
         cmd = cmd.subcommand(
+            Command::new("+read")
+                .about("Extract plain-text body from a Gmail message")
+                .arg(
+                    Arg::new("message-id")
+                        .long("message-id")
+                        .required(true)
+                        .help("The ID of the message to read")
+                        .value_name("ID"),
+                )
+                .after_help(
+                    "\
+EXAMPLES:
+  gws gmail +read --message-id 18f1a2b3c4d
+
+TIPS:
+  Converts HTML-only messages to plain text (markdown-like).
+  Handles multipart/alternative and base64 decoding automatically.",
+                ),
+        );
+
+        cmd = cmd.subcommand(
             Command::new("+watch")
                 .about("[Helper] Watch for new emails and stream them as NDJSON")
                 .arg(
@@ -1100,6 +1122,11 @@ TIPS:
         Box::pin(async move {
             if let Some(matches) = matches.subcommand_matches("+send") {
                 handle_send(doc, matches).await?;
+                return Ok(true);
+            }
+
+            if let Some(matches) = matches.subcommand_matches("+read") {
+                read::handle_read(doc, matches).await?;
                 return Ok(true);
             }
 
