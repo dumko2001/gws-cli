@@ -1,0 +1,256 @@
+[
+  {
+    "assignees": [],
+    "body": "## Description\n\nOn Windows, the `.encryption_key` fallback path in `credential_store.rs` writes the AES-256-GCM encryption key as a plaintext file with no access controls applied.\n\nOn Unix, the key file is explicitly created with mode `0o600` (user-read/write only):\n\n```rust\n#[cfg(unix)]\n{\n    use std::os::unix::fs::OpenOptionsExt;\n    let mut options = std::fs::OpenOptions::new();\n    options.write(true).create(true).truncate(true).mode(0o600);\n    ...\n}\n#[cfg(not(unix))]\n{\n    let _ = std::fs::write(&key_file, &b64_key);  // no permission hardening\n}\n```\n\nOn Windows, `std::fs::write` is used with no equivalent ACL restrictions, meaning the key file inherits default directory permissions and is readable by other users or processes on the same machine.\n\nThis key decrypts `credentials.<b64-email>.enc`, which contains the OAuth refresh token. An attacker with local read access can decrypt the token and gain long-lived Google account access.\n\n## Affected Code\n\nThree locations in `src/credential_store.rs` write sensitive files without Windows ACLs:\n\n1. **Line 112-115** \u2014 `.encryption_key` file (keyring `NoEntry` fallback)\n2. **Line 172-175** \u2014 `.encryption_key` file (keyring failure fallback)\n3. **Lines 246, 305** \u2014 `credentials.*.enc` files (via `atomic_write`)\n\nAdditionally, the config **directory** itself (`~/.config/gws/`) gets `0o700` on Unix (lines 89-99, 150-159) but no ACL on Windows.\n\n## Fix Plan\n\n### Option A: `windows-acl` crate (recommended)\n```toml\n[target.'cfg(windows)'.dependencies]\nwindows-acl = \"0.3\"\n```\n\nCreate a helper function:\n```rust\n#[cfg(windows)]\nfn set_owner_only_acl(path: &Path) -> std::io::Result<()> {\n    use windows_acl::acl::ACL;\n    // Get current user SID, set DACL to owner-only\n}\n```\n\nCall it after every file write on Windows (same locations where `#[cfg(unix)]` sets `0o600`).\n\n### Option B: Raw Win32 via `windows` crate\nUse `SetNamedSecurityInfoW` directly. More control but more boilerplate.\n\n### Option C: Interim warning\nPrint a warning on Windows when falling back to file storage:\n```\n\u26a0\ufe0f  Warning: Encryption key stored without access controls. \n    Run 'icacls %USERPROFILE%\\.config\\gws /inheritance:r /grant:r %USERNAME%:F' to restrict access.\n```\n\n## Files to Modify\n\n- `Cargo.toml` \u2014 add Windows-only dependency\n- `src/credential_store.rs` \u2014 add `#[cfg(windows)]` ACL blocks at all 3 write locations + directory creation\n- Optionally: extract a `set_secure_permissions(path)` helper that dispatches to `chmod 0o600` on Unix and ACL on Windows\n\n## Verification\n\n- Windows: `icacls ~/.config/gws/.encryption_key` should show only current user\n- Windows: `icacls ~/.config/gws/credentials.*.enc` should show only current user\n- Unix: behavior unchanged (`ls -la` confirms `0o600`)\n- CI: Windows test runner should exercise the keyring fallback path\n\n## Workaround\n\nUse Windows Credential Manager (the primary keyring path). There is currently no way to force this from the CLI. If keyring works, the file fallback is never used.\n",
+    "labels": [
+      {
+        "id": "LA_kwDORcxyRs8AAAACaTPRQg",
+        "name": "area: auth",
+        "description": "",
+        "color": "1d76db"
+      }
+    ],
+    "number": 153,
+    "title": "[Security] Windows: encryption key written to plaintext file with no access controls",
+    "updatedAt": "2026-03-07T16:08:16Z"
+  },
+  {
+    "assignees": [],
+    "body": "gws version: 0.4.4\nOS: macOS (Apple Silicon, MacBook Pro)\nAccount type: Personal @gmail.com\nDescription\nAfter authenticating with gws auth login --scopes https://www.googleapis.com/auth/drive,https://www.googleapis.com/auth/script.projects, all Google Drive API calls work correctly but all Apps Script API calls fail with 401 \"invalid authentication credentials.\"\nSteps to Reproduce\n\nInstall gws via npm: npm install -g @googleworkspace/cli\nPlace custom client_secret.json in ~/.config/gws/\nEnable both Google Drive API and Apps Script API in GCP project\nEnable Apps Script API at https://script.google.com/home/usersettings\nAuthenticate:\n\nbashgws auth login --scopes https://www.googleapis.com/auth/drive,https://www.googleapis.com/auth/script.projects\n\nExport unmasked credentials (required due to separate Keychain issue \u2014 see below):\n\nbashgws auth export --unmasked > ~/.config/gws/credentials.json\n\nVerify auth status shows correct scopes:\n\nbashgws auth status\n# Shows scope_count: 2, token_valid: true, both drive and script.projects scopes listed\n\nTest Drive API \u2014 works:\n\nbashgws drive files list --params '{\"pageSize\": 5, \"fields\": \"files(id,name,mimeType)\"}' --format table\n# Returns file listing successfully\n\nTest Apps Script API \u2014 fails:\n\nbashgws apps-script projects getContent --params '{\"scriptId\": \"VALID_SCRIPT_ID\"}'\n# Returns 401 error\nExpected Behavior\ngws apps-script projects getContent should return the script project content, since the credentials include the script.projects scope and the Apps Script API is enabled.\nActual Behavior\njson{\n  \"error\": {\n    \"code\": 401,\n    \"message\": \"Request had invalid authentication credentials. Expected OAuth 2 access token, login cookie or other valid authentication credential. See https://developers.google.com/identity/sign-in/web/devconsole-project.\",\n    \"reason\": \"unknown\"\n  }\n}\nAdditional Context\nScope issue required revoking app access\nInitially, after adding script.projects to an existing auth session, the API returned 403 \"insufficient authentication scopes\" even though gws auth status showed the scope was present. This was resolved by revoking app access at https://myaccount.google.com/permissions and re-authenticating from scratch. After revoking, the error changed from 403 to 401.\nSeparate issue: encrypted credentials not usable for API calls\nOn macOS, gws auth login saves encrypted credentials via OS Keyring, but API calls (e.g., gws drive files list) fail with 401 \"No credentials provided\" unless you first run gws auth export --unmasked > ~/.config/gws/credentials.json to create a plaintext credentials file. The gws auth status command can read the encrypted credentials fine, but the API call code path cannot. This workaround resolves Drive API calls but does not resolve the Apps Script 401.",
+    "labels": [
+      {
+        "id": "LA_kwDORcxyRs8AAAACaTPRQg",
+        "name": "area: auth",
+        "description": "",
+        "color": "1d76db"
+      }
+    ],
+    "number": 205,
+    "title": "Apps Script API returns 401 \"invalid authentication credentials\" while Drive API works with same credentials",
+    "updatedAt": "2026-03-06T01:20:33Z"
+  },
+  {
+    "assignees": [],
+    "body": "This may be out of scope, this app doesn't support [Advanced Protection Program](https://landing.google.com/intl/en_in/advancedprotection/) users, with a failure during authentication:\n\n<img width=\"964\" height=\"430\" alt=\"Image\" src=\"https://github.com/user-attachments/assets/35117a79-be2f-44fb-967f-0b24aba58c88\" />\n\nUnderstandably, this may just be a limitation of Advanced Protection, though it's always a bit of a confusing threat model that I can grant Claude connectors extensive access to my emails and Gdrive, but not read-only scopes for my own app.",
+    "labels": [
+      {
+        "id": "LA_kwDORcxyRs8AAAACaTPRQg",
+        "name": "area: auth",
+        "description": "",
+        "color": "1d76db"
+      }
+    ],
+    "number": 197,
+    "title": "Doesn't support Advanced Protection Program users",
+    "updatedAt": "2026-03-14T00:53:12Z"
+  },
+  {
+    "assignees": [],
+    "body": "## Summary\nWhen authenticating with read-only scopes using `gws auth login --readonly`, exporting credentials with:\n\n```bash\ngws auth export --unmasked > credentials.json\n```\n\nand then using those credentials on another machine (OpenClaw), the resulting access appears to still allow full/write operations.\n\n## Reproduction\n1. Run:\n   ```bash\n   gws auth login --readonly\n   ```\n2. Export credentials:\n   ```bash\n   gws auth export --unmasked > credentials.json\n   ```\n3. Move `credentials.json` to an external machine/environment (OpenClaw).\n4. Use the exported credentials with `gws` there.\n5. Attempt a write operation (for example, Gmail send).\n\n## Actual behavior\nWrite/full-access behavior is still possible on the external machine, even though login was done with `--readonly`.\n\n## Expected behavior\nRead-only scope enforcement should persist with exported credentials and be enforced by Google-issued token scopes, not only by client-side command restrictions.\n\n## Questions\n- Are `--readonly` scopes currently enforced only in the local client flow, rather than in the OAuth token/scopes themselves?\n- If so, what is the recommended way to ensure exported credentials are truly read-only on external machines?\n- Can `--readonly` become the default behavior in the installer/setup flow (or at least a strongly guided default), not just a local/client-side option?\n\n## Why this matters\nUsers exporting credentials for remote execution expect least-privilege guarantees to carry over across machines/environments.\n",
+    "labels": [
+      {
+        "id": "LA_kwDORcxyRs8AAAACaTPRQg",
+        "name": "area: auth",
+        "description": "",
+        "color": "1d76db"
+      }
+    ],
+    "number": 168,
+    "title": "gws auth login --readonly + auth export --unmasked appears to allow full access on external machine",
+    "updatedAt": "2026-03-12T12:31:16Z"
+  },
+  {
+    "assignees": [],
+    "body": "I can't get `npx -y @googleworkspace/cli@latest auth login` to work properly. I triple checked the settings of my auth:\n* Status: testing\n* User type: external\n* Test user: includes myself\n* Client ID: Desktop\n\nThe only \"strange\" thing is that I can't set a redirect URI, which according to `auth setup` is necessary.\n\n`auth login` shows an URL, after browsing to it and approving all scopes on the \"... wants to access your Google Account\" page, I get this on a page https://accounts.google.com/info/unknownerror?...:\n\n<img width=\"1115\" height=\"490\" alt=\"Image\" src=\"https://github.com/user-attachments/assets/71ea22a3-c2df-4d34-ac47-d6774a7d7088\" />",
+    "labels": [
+      {
+        "id": "LA_kwDORcxyRs8AAAACaTPRQg",
+        "name": "area: auth",
+        "description": "",
+        "color": "1d76db"
+      }
+    ],
+    "number": 157,
+    "title": "\"Something went wrong\" in oauth screen",
+    "updatedAt": "2026-03-05T20:37:48Z"
+  },
+  {
+    "assignees": [],
+    "body": "## Problem\n\nWhen an AI agent tries to help a user unsubscribe from mailing lists using `gws`, there is no guided path. The agent has to:\n\n1. Search for emails containing \"unsubscribe\"\n2. Fetch each message with `format: full` to extract `List-Unsubscribe` headers\n3. Guess whether to use the HTTPS URL or mailto address\n4. Attempt `curl` GET/POST requests to unsubscribe URLs (which mostly load confirmation pages requiring a browser)\n5. Fall back to sending emails to `mailto:` unsubscribe addresses via `gws gmail users messages send`\n\nThis entire process is trial-and-error, fragile, and often fails.\n\nMeanwhile, **Gmail natively supports one-click unsubscribe via RFC 8058**. Since June 2024, Google requires bulk senders to include `List-Unsubscribe-Post: List-Unsubscribe=One-Click` headers. The correct unsubscribe mechanism is a simple `POST` to the `List-Unsubscribe` HTTPS URL with the body `List-Unsubscribe=One-Click` \u2014 no browser needed, no mailto, no guessing.\n\n## Proposal\n\nAdd a `gws gmail +unsubscribe` helper skill that:\n\n1. **Lists candidates** \u2014 Scans recent emails for `List-Unsubscribe` and `List-Unsubscribe-Post` headers, groups by sender, and shows frequency/volume\n2. **Executes RFC 8058 one-click unsubscribe** \u2014 Sends the correct `POST` request with `List-Unsubscribe=One-Click` body to the HTTPS unsubscribe URL\n3. **Falls back gracefully** \u2014 For senders without RFC 8058 support, shows the mailto address or URL so the agent/user can decide\n\n### Example UX\n\n```bash\n# List subscription candidates with volume\ngws gmail +unsubscribe --list --max 200\n\n# Unsubscribe from a specific sender\ngws gmail +unsubscribe --from \"noreply@mail.michaelpage.com.sg\"\n\n# Dry run\ngws gmail +unsubscribe --from \"team@mail.cerebralvalley.ai\" --dry-run\n```\n\n## Why this matters for agents\n\nThe existing `gws-gmail-triage` skill is great for reading, but there's no skill for the common \"clean up my inbox subscriptions\" workflow. Without a dedicated skill, agents waste many API calls fumbling through message formats, header extraction, and URL guessing \u2014 exactly the kind of boilerplate `gws` is designed to eliminate.\n\n## References\n\n- [RFC 8058 \u2014 Signaling One-Click Functionality for List Email Headers](https://datatracker.ietf.org/doc/html/rfc8058)\n- [Gmail bulk sender requirements (June 2024)](https://support.google.com/a/answer/81126)",
+    "labels": [
+      {
+        "id": "LA_kwDORcxyRs8AAAACaTPPVw",
+        "name": "area: skills",
+        "description": "",
+        "color": "7057ff"
+      }
+    ],
+    "number": 114,
+    "title": "Add a gmail +unsubscribe skill for one-click list unsubscribe (RFC 8058)",
+    "updatedAt": "2026-03-06T07:16:56Z"
+  },
+  {
+    "assignees": [],
+    "body": "Hi! I love skills. But I also hate how they create issues for agents.\n\nContext pollution is real and I can already see that some of skills included in the repo cross-reference other skills. Problem with this is that the top level skills all get loaded into <available_skills>, and 40 of them, added to any other skills that people use, will make for a really bad experience.\n\nObviously, one might say that not all of them need to be installed at once, but with how heavy the cross-references are, basically none of them are skippable.\n\nProposal:\n\nEven if it costs some duplication, bundle the granular skills in a top level structure, with /references/ folder.\n\nI believe this will save both the users and the devs a lot of headaches, and it will be easier for users to manage a situation where they might only need parts of the included skills.\n\n",
+    "labels": [
+      {
+        "id": "LA_kwDORcxyRs8AAAACaTPPVw",
+        "name": "area: skills",
+        "description": "",
+        "color": "7057ff"
+      }
+    ],
+    "number": 82,
+    "title": "Optimisation: 40 skills => less skills + references",
+    "updatedAt": "2026-03-06T01:20:35Z"
+  },
+  {
+    "assignees": [],
+    "body": "I know that this request has been made by others, but they are not in this list of issues any more. So I'm putting it back.\n\nRelease 0.7.0 says that multiple accounts were removed. With no reason why.\n\nMultiple accounts can be handy but ESPECIALLY in the age of AI agents. I need to be able to assign my agent account (created in Google) to be able to take actions. And by using the agent account credentials, it becomes auditable. \n\nAnd access can be switched off at a moments notice.\n\nI would say that being able to have multiple agents is a security concern, because it enables proper separation of permissions.\n\nPlease bring it back",
+    "labels": [],
+    "number": 439,
+    "title": "Please restore multiple accounts being able to be used",
+    "updatedAt": "2026-03-13T00:31:55Z"
+  },
+  {
+    "assignees": [],
+    "body": "Hi, \nAfter upgrading to the latest version, which finally resolved my issues with macOS keychain, I seem to now miss the admin directory services from the gws cli despite enabling the admin directory API on my GCP project and on my auth scopes\n\n<img width=\"920\" height=\"634\" alt=\"Image\" src=\"https://github.com/user-attachments/assets/631b91c8-3091-4a5d-9e80-72430368e904\" />",
+    "labels": [],
+    "number": 430,
+    "title": "Missing admin directory SDK on the newest version?",
+    "updatedAt": "2026-03-14T11:13:10Z"
+  },
+  {
+    "assignees": [],
+    "body": "Vulnerability Type: Time-of-Check to Time-of-Use (TOCTOU) Race Condition / Insecure File Permissions Component: \nsrc/fs_util.rs\n, \nsrc/credential_store.rs\n, \nsrc/oauth_config.rs\n\nDetails: The \ngws\n CLI uses \natomic_write\n and \natomic_write_async\n in \nsrc/fs_util.rs\n to persist sensitive information like client_secret.json and encrypted OAuth tokens (credentials.enc).\n\nCurrently, these functions write the data to a temporary file (e.g., client_secret.json.tmp) using the default system umask (often 0644 or 0666), and then rename it into place. The permissions are only tightened to 0600 after the file has been renamed (e.g., in oauth_config.rs:88).\n\nImpact: A local attacker running a script that watches the ~/.config/gws/ directory via inotify can open the temporary file or the renamed file before the chmod 0o600 is applied. This allows a low-privileged user on a shared system to exfiltrate the victim's Google Workspace plaintext OAuth client secrets or encrypted credential material.\n\nProposed Fix: The temporary file must be created with secure 0o600 permissions atomically at creation time using std::os::unix::fs::OpenOptionsExt, completely eliminating the TOCTOU window. I have a patch ready to submit",
+    "labels": [],
+    "number": 401,
+    "title": "TOCTOU Race Condition in fs_util::atomic_write Leads to Local Plaintext Secret Leakage",
+    "updatedAt": "2026-03-11T11:04:41Z"
+  },
+  {
+    "assignees": [],
+    "body": "## Summary\n\nThe repository currently has no issue templates (only a PR template). As the project grows, issue templates would help contributors file consistent, actionable reports for bugs, feature requests, and docs improvements \u2014 reducing back-and-forth for maintainers.\n\n## Suggested templates\n\n- **Bug report** \u2014 reproduction steps, expected vs actual behavior, OS/version info\n- **Feature request** \u2014 problem description, proposed solution\n- **Docs improvement** \u2014 which doc, what's missing or wrong\n\nThese could live in `.github/ISSUE_TEMPLATE/` as standard GitHub issue forms (YAML) or plain markdown templates.\n\n## Bonus: structured input for AI agents\n\nGiven that this project explicitly targets AI agents as users, consistent issue structure also creates a reliable input format for automation. Skills could be built around issue triage, reproduction, or even implementation \u2014 but only if issues follow a predictable schema. Issue templates are a low-effort way to enable that.",
+    "labels": [],
+    "number": 400,
+    "title": "meta: add GitHub issue templates",
+    "updatedAt": "2026-03-11T10:15:47Z"
+  },
+  {
+    "assignees": [],
+    "body": "This package contains a lot of skills. \n\nConsider implementing support for a skill.json file to make them more manageable and discoverable.\n\nsee https://github.com/automaton-labs/skill.json",
+    "labels": [],
+    "number": 356,
+    "title": "Consider making skills more discoverable with skill.json.",
+    "updatedAt": "2026-03-10T00:21:46Z"
+  },
+  {
+    "assignees": [],
+    "body": "I see the agents flail around trying to find a document in a shared drive and I often have to stop it and say \"the data is in a shared drive\". Not sure if that can be a note in the skills document to mention \"if file is not found, try `supportsAllDrives: true`\"",
+    "labels": [],
+    "number": 327,
+    "title": "update skills document to mention shared drives (supportsAllDrives: true)",
+    "updatedAt": "2026-03-09T14:58:51Z"
+  },
+  {
+    "assignees": [],
+    "body": "## Why\n\n`gws` has a rich set of services, resources, and methods, but there's no shell completion support yet. Tab completion would significantly improve the CLI experience, especially for discovering available services/resources/methods without referring to `--help` each time.\n\n## What\n\nAdd shell completion generation for major shells:\n- bash\n- zsh\n- fish\n\nIdeally via a subcommand like `gws completion <shell>` that outputs the completion script to stdout, following the common CLI pattern (e.g., `gh completion`, `kubectl completion`).\n\n## How\n\n- Top-level services (`drive`, `sheets`, `gmail`, `calendar`, etc.)\n- Resources per service (`files`, `spreadsheets`, `messages`, etc.)\n- Methods per resource (`list`, `get`, `create`, `update`, `delete`, etc.)\n- Global flags (`--params`, `--json`, `--format`, `--page-all`, etc.)",
+    "labels": [],
+    "number": 323,
+    "title": "feat: Add shell completion support (bash, zsh, fish)",
+    "updatedAt": "2026-03-09T13:24:20Z"
+  },
+  {
+    "assignees": [],
+    "body": "gws auth login \r\n  \"message\": \"Authentication successful. Encrypted credentials saved.\",\r\n  \"scopes\": [\r\n    \"https://www.googleapis.com/auth/drive\",\r\n    \"https://www.googleapis.com/auth/spreadsheets\",\r\n    \"https://www.googleapis.com/auth/gmail.modify\",\r\n    \"https://www.googleapis.com/auth/calendar\",\r\n    \"https://www.googleapis.com/auth/documents\",\r\n    \"https://www.googleapis.com/auth/presentations\",\r\n    \"https://www.googleapis.com/auth/tasks\",\r\n    \"https://www.googleapis.com/auth/pubsub\",\r\n    \"https://www.googleapis.com/auth/cloud-platform\",\r\n    \"openid\",\r\n    \"https://www.googleapis.com/auth/userinfo.email\"\r\n  ],\r\n  \"status\": \"success\"\r\n\r\nbut \r\ngws drive files list --params '{\"pageSize\": 5}'\r\n{\r\n  \"error\": {\r\n    \"code\": 500,\r\n    \"message\": \"Failed to fetch Discovery Document for drive/v3: HTTP 404 Not Found (tried both standard and $discovery URLs)\",\r\n    \"reason\": \"discoveryError\"\r\n  }\r\n}\r\n\r\n_Originally posted by @kaijung in https://github.com/googleworkspace/cli/discussions/257_",
+    "labels": [],
+    "number": 314,
+    "title": "Failed to fetch Discovery Document for drive/v3: HTTP 404 Not Found",
+    "updatedAt": "2026-03-09T18:29:01Z"
+  },
+  {
+    "assignees": [],
+    "body": "I installed the cli and then ran the `gws auth setup` and it returned\n\n<img width=\"1848\" height=\"189\" alt=\"Image\" src=\"https://github.com/user-attachments/assets/ef5e86d6-b479-4fe7-ae76-a177176c78f3\" />\n\nis it expected?",
+    "labels": [],
+    "number": 309,
+    "title": "bug: Error on doing the steps in readme",
+    "updatedAt": "2026-03-08T10:39:06Z"
+  },
+  {
+    "assignees": [],
+    "body": "**Environment**\n- OS: Windows\n- Node.js: compatible with the package requirement (>=18)\n- npm: global install\n\n**What I ran**\n```\nnpm uninstall -g @googleworkspace/cli\nnpm cache clean --force\nnpm install -g @googleworkspace/cli\ngws auth setup\n```\n\n**What happened**\nThe command fails with:\n\n```\nError: spawnSync C:\\Users\\Hanekawa\\AppData\\Roaming\\npm\\node_modules\\@googleworkspace\\cli\\node_modules\\.bin_real\\gws.exe ENOENT\n    at Object.spawnSync (node:internal/child_process:1119:20)\n    at spawnSync (node:child_process:911:24)\n    at C:\\Users\\Hanekawa\\AppData\\Roaming\\npm\\node_modules\\@googleworkspace\\cli\\binary-install.js:197:24\n    at process.processTicksAndRejections (node:internal/process/task_queues:104:5) {\n  errno: -4058,\n  code: 'ENOENT',\n  syscall: 'spawnSync C:\\\\Users\\\\Hanekawa\\\\AppData\\\\Roaming\\\\npm\\\\node_modules\\\\@googleworkspace\\\\cli\\\\node_modules\\\\.bin_real\\\\gws.exe',\n  path: 'C:\\\\Users\\\\Hanekawa\\\\AppData\\\\Roaming\\\\npm\\\\node_modules\\\\@googleworkspace\\\\cli\\\\node_modules\\\\.bin_real\\\\gws.exe',\n  spawnargs: [ 'auth', 'setup' ]\n}\n```\n\n**Verification**\nI checked whether the expected binary exists:\n\n```\nTest-Path \"C:\\Users\\Hanekawa\\AppData\\Roaming\\npm\\node_modules\\@googleworkspace\\cli\\node_modules\\.bin_real\\gws.exe\"\n```\n\nResult:\n```\nFalse\n```\n\nSo the package appears to install successfully via npm, but the actual Windows binary is missing from the location the wrapper expects.\n\n**Expected behavior**\n`npm install -g @googleworkspace/cli` should install or place `gws.exe` in the expected path so `gws auth setup` can run.\n\n**Notes**\nThis looks like a packaging/install-script issue specific to Windows, rather than a Node version issue.",
+    "labels": [],
+    "number": 306,
+    "title": "Windows install is missing `gws.exe`, causing `gws auth setup` to fail with ENOENT",
+    "updatedAt": "2026-03-08T07:27:47Z"
+  },
+  {
+    "assignees": [],
+    "body": "```\nnpm install @googleworkspace/cli@0.7.0\nnpm error code 1\nnpm error path /tmp/tmp-package0.36392758024749083/node_modules/@googleworkspace/cli\nnpm error command failed\nnpm error command sh -c node ./install.js\nnpm error Your glibc isn't compatible; trying static musl binary instead\nnpm error Downloading release from https://github.com/googleworkspace/cli/releases/download/v0.7.0/gws-x86_64-unknown-linux-musl.tar.gz\nnpm error Error fetching release: spawnSync tar ENOENT\nnpm error A complete log of this run can be found in: /tmp/cache/_logs/2026-03-06T22_08_26_142Z-debug-0.log\n```\n\nThis appears to be using musl when it should be using glibc.\n\nThis was running on Amazon Linux 2023.",
+    "labels": [],
+    "number": 284,
+    "title": "npm error Your glibc isn't compatible; trying static musl binary instead spawnSync tar ENOENT",
+    "updatedAt": "2026-03-09T21:31:38Z"
+  },
+  {
+    "assignees": [],
+    "body": "Hi,\n\nThanks for this project!\n\nI just tried to auth with all scopes and got\n\nSome requested scopes cannot be shown: [https://www.googleapis.com/auth/cloud-identity.devices] If you are a developer of XXXXXXXXXX, see error details. Error 400: invalid_scope\n\nI'm not sure if the scope is invalid or it's because my gcloud project is missing this API or because I'm on enterprise account and do not have super admin permission.\n\n",
+    "labels": [],
+    "number": 258,
+    "title": "Some requested scopes cannot be shown: [https://www.googleapis.com/auth/cloud-identity.devices]. Error 400: invalid_scope",
+    "updatedAt": "2026-03-13T17:42:39Z"
+  },
+  {
+    "assignees": [],
+    "body": "## Problem\n\nThere's no way to send a Gmail message with an attachment using `gws`. Two approaches fail:\n\n### 1. `--json` with base64url-encoded raw MIME \u2014 hits OS argument length limit\n\nThe documented approach for sending raw MIME (with `threadId`, `In-Reply-To`, `References` headers, and attachments) is to base64url-encode the entire message and pass it via `--json '{\"raw\": \"...\"}'`. But even a modest ~577KB PDF attachment produces a ~1MB base64 payload, which exceeds macOS's ~256KB `ARG_MAX` for command-line arguments:\n\n```\ngws-behav gmail users messages send --params '{\"userId\": \"me\"}' --json \"{\\\"threadId\\\": \\\"...\\\", \\\"raw\\\": \\\"$RAW\\\"}\"\n# => zsh: argument list too long: gws\n```\n\n### 2. `--upload` with raw MIME file \u2014 wrong content type\n\nGmail's `/upload/gmail/v1/users/me/messages/send` endpoint accepts `message/rfc822` for media uploads. But `--upload` wraps the file in `multipart/related` with an auto-detected content type, which Gmail rejects:\n\n```\ngws gmail users messages send --params '{\"userId\": \"me\", \"uploadType\": \"media\"}' --upload message.eml\n# => Media type 'multipart/related; boundary=gws_boundary_...' is not supported.\n```\n\n## Suggested fixes\n\nAny of these would unblock the use case:\n\n1. **`--json-file <PATH>`** or **`--json @<PATH>`** \u2014 read JSON body from a file (like `curl -d @file.json`)\n2. **`--json -`** \u2014 read JSON body from stdin\n3. **`--upload-type <MIME>`** \u2014 let users override the content type for `--upload` (e.g. `--upload-type message/rfc822`)\n4. **Auto-detect `.eml` \u2192 `message/rfc822`** in `--upload` content type detection\n\nOptions 1 or 2 are the most general and would help any API method with large request bodies, not just Gmail.\n\n## Environment\n\n- gws 0.4.4\n- macOS Darwin 25.3.0 (arm64)\n\n## Related\n\n- #88 \u2014 first-class reply/forward support would also solve this at a higher level\n- #244 \u2014 OOM on large file uploads (related large-payload issue)",
+    "labels": [],
+    "number": 247,
+    "title": "Gmail: cannot send emails with attachments (--json arg limit, --upload wrong content type)",
+    "updatedAt": "2026-03-12T01:03:30Z"
+  },
+  {
+    "assignees": [],
+    "body": "Does this project plan to support browsing Google Photos on the CLI? It would be nice to do analyses on photos using LLMs.",
+    "labels": [
+      {
+        "id": "LA_kwDORcxyRs8AAAACaTQH5w",
+        "name": "area: discovery",
+        "description": "",
+        "color": "006b75"
+      }
+    ],
+    "number": 163,
+    "title": "Any plan to support Google Photos?",
+    "updatedAt": "2026-03-05T20:48:15Z"
+  },
+  {
+    "assignees": [],
+    "body": "Add an option to make HITL / requests gateway so those of us that are using agents and want to gatekeep them for oauth and write actions can do it",
+    "labels": [
+      {
+        "id": "LA_kwDORcxyRs8AAAACaTPT1Q",
+        "name": "area: mcp",
+        "description": "",
+        "color": "c46210"
+      }
+    ],
+    "number": 158,
+    "title": "Add built in HITL that the agents can't edit in code",
+    "updatedAt": "2026-03-05T20:38:09Z"
+  },
+  {
+    "assignees": [],
+    "body": "It would be convenient to be able to install this tool using Homebrew \ud83d\ude04 ",
+    "labels": [
+      {
+        "id": "LA_kwDORcxyRs8AAAACaTP5NQ",
+        "name": "area: distribution",
+        "description": "",
+        "color": "e07be0"
+      }
+    ],
+    "number": 90,
+    "title": "Feature request: Homebrew Formula",
+    "updatedAt": "2026-03-05T20:38:12Z"
+  }
+]

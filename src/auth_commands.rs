@@ -178,6 +178,7 @@ pub async fn run_login(args: &[String]) -> Result<(), GwsError> {
 /// Optionally includes `login_hint` in the URL for account pre-selection.
 struct CliFlowDelegate {
     login_hint: Option<String>,
+    force_consent: bool,
 }
 
 impl yup_oauth2::authenticator_delegate::InstalledFlowDelegate for CliFlowDelegate {
@@ -189,7 +190,7 @@ impl yup_oauth2::authenticator_delegate::InstalledFlowDelegate for CliFlowDelega
     {
         Box::pin(async move {
             // Inject login_hint into the OAuth URL if we have one
-            let display_url = if let Some(ref hint) = self.login_hint {
+            let mut display_url = if let Some(ref hint) = self.login_hint {
                 let encoded: String = percent_encoding::percent_encode(
                     hint.as_bytes(),
                     percent_encoding::NON_ALPHANUMERIC,
@@ -203,6 +204,15 @@ impl yup_oauth2::authenticator_delegate::InstalledFlowDelegate for CliFlowDelega
             } else {
                 url.to_string()
             };
+
+            // Inject prompt=consent if requested (for readonly enforcement)
+            if self.force_consent {
+                if display_url.contains('?') {
+                    display_url.push_str("&prompt=consent");
+                } else {
+                    display_url.push_str("?prompt=consent");
+                }
+            }
             eprintln!("Open this URL in your browser to authenticate:\n");
             eprintln!("  {display_url}\n");
             Ok(String::new())
@@ -296,6 +306,8 @@ async fn handle_login(args: &[String]) -> Result<(), GwsError> {
             .map_err(|e| GwsError::Validation(format!("Failed to create config directory: {e}")))?;
     }
 
+    let is_readonly = args.iter().any(|a| a == "--readonly");
+
     let auth = yup_oauth2::InstalledFlowAuthenticator::builder(
         secret,
         yup_oauth2::InstalledFlowReturnMethod::HTTPRedirect,
@@ -303,8 +315,11 @@ async fn handle_login(args: &[String]) -> Result<(), GwsError> {
     .with_storage(Box::new(crate::token_storage::EncryptedTokenStorage::new(
         temp_path.clone(),
     )))
-    .force_account_selection(true) // Adds prompt=consent so Google always returns a refresh_token
-    .flow_delegate(Box::new(CliFlowDelegate { login_hint: None }))
+    .force_account_selection(true)
+    .flow_delegate(Box::new(CliFlowDelegate {
+        login_hint: None,
+        force_consent: is_readonly,
+    }))
     .build()
     .await
     .map_err(|e| GwsError::Auth(format!("Failed to build authenticator: {e}")))?;

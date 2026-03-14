@@ -55,6 +55,12 @@ pub const SERVICES: &[ServiceEntry] = &[
         description: "Audit logs and usage reports",
     },
     ServiceEntry {
+        aliases: &["admin-directory", "directory"],
+        api_name: "admin",
+        version: "directory_v1",
+        description: "Manage users, groups, and devices",
+    },
+    ServiceEntry {
         aliases: &["docs"],
         api_name: "docs",
         version: "v1",

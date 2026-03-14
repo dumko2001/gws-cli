@@ -1,0 +1,151 @@
+[
+  {
+    "number": 439,
+    "title": "Please restore multiple accounts being able to be used",
+    "labels": [],
+    "updatedAt": "2026-03-13T00:31:55Z",
+    "body_snippet": "I know that this request has been made by others, but they are not in this list of issues any more. So I'm putting it back.  Release 0.7.0 says that multiple accounts were removed. With no reason why...."
+  },
+  {
+    "number": 430,
+    "title": "Missing admin directory SDK on the newest version?",
+    "labels": [],
+    "updatedAt": "2026-03-14T11:13:10Z",
+    "body_snippet": "Hi,  After upgrading to the latest version, which finally resolved my issues with macOS keychain, I seem to now miss the admin directory services from the gws cli despite enabling the admin directory ..."
+  },
+  {
+    "number": 401,
+    "title": "TOCTOU Race Condition in fs_util::atomic_write Leads to Local Plaintext Secret Leakage",
+    "labels": [],
+    "updatedAt": "2026-03-11T11:04:41Z",
+    "body_snippet": "Vulnerability Type: Time-of-Check to Time-of-Use (TOCTOU) Race Condition / Insecure File Permissions Component:  src/fs_util.rs ,  src/credential_store.rs ,  src/oauth_config.rs  Details: The  gws  CL..."
+  },
+  {
+    "number": 356,
+    "title": "Consider making skills more discoverable with skill.json.",
+    "labels": [],
+    "updatedAt": "2026-03-10T00:21:46Z",
+    "body_snippet": "This package contains a lot of skills.   Consider implementing support for a skill.json file to make them more manageable and discoverable.  see https://github.com/automaton-labs/skill.json..."
+  },
+  {
+    "number": 323,
+    "title": "feat: Add shell completion support (bash, zsh, fish)",
+    "labels": [],
+    "updatedAt": "2026-03-09T13:24:20Z",
+    "body_snippet": "## Why  `gws` has a rich set of services, resources, and methods, but there's no shell completion support yet. Tab completion would significantly improve the CLI experience, especially for discovering..."
+  },
+  {
+    "number": 314,
+    "title": "Failed to fetch Discovery Document for drive/v3: HTTP 404 Not Found",
+    "labels": [],
+    "updatedAt": "2026-03-09T18:29:01Z",
+    "body_snippet": "gws auth login \r   \"message\": \"Authentication successful. Encrypted credentials saved.\",\r   \"scopes\": [\r     \"https://www.googleapis.com/auth/drive\",\r     \"https://www.googleapis.com/auth/spreadsheets..."
+  },
+  {
+    "number": 309,
+    "title": "bug: Error on doing the steps in readme",
+    "labels": [],
+    "updatedAt": "2026-03-08T10:39:06Z",
+    "body_snippet": "I installed the cli and then ran the `gws auth setup` and it returned  <img width=\"1848\" height=\"189\" alt=\"Image\" src=\"https://github.com/user-attachments/assets/ef5e86d6-b479-4fe7-ae76-a177176c78f3\" ..."
+  },
+  {
+    "number": 306,
+    "title": "Windows install is missing `gws.exe`, causing `gws auth setup` to fail with ENOENT",
+    "labels": [],
+    "updatedAt": "2026-03-08T07:27:47Z",
+    "body_snippet": "**Environment** - OS: Windows - Node.js: compatible with the package requirement (>=18) - npm: global install  **What I ran** ``` npm uninstall -g @googleworkspace/cli npm cache clean --force npm inst..."
+  },
+  {
+    "number": 284,
+    "title": "npm error Your glibc isn't compatible; trying static musl binary instead spawnSync tar ENOENT",
+    "labels": [],
+    "updatedAt": "2026-03-09T21:31:38Z",
+    "body_snippet": "``` npm install @googleworkspace/cli@0.7.0 npm error code 1 npm error path /tmp/tmp-package0.36392758024749083/node_modules/@googleworkspace/cli npm error command failed npm error command sh -c node ...."
+  },
+  {
+    "number": 258,
+    "title": "Some requested scopes cannot be shown: [https://www.googleapis.com/auth/cloud-identity.devices]. Error 400: invalid_scope",
+    "labels": [],
+    "updatedAt": "2026-03-13T17:42:39Z",
+    "body_snippet": "Hi,  Thanks for this project!  I just tried to auth with all scopes and got  Some requested scopes cannot be shown: [https://www.googleapis.com/auth/cloud-identity.devices] If you are a developer of X..."
+  },
+  {
+    "number": 247,
+    "title": "Gmail: cannot send emails with attachments (--json arg limit, --upload wrong content type)",
+    "labels": [],
+    "updatedAt": "2026-03-12T01:03:30Z",
+    "body_snippet": "## Problem  There's no way to send a Gmail message with an attachment using `gws`. Two approaches fail:  ### 1. `--json` with base64url-encoded raw MIME \u2014 hits OS argument length limit  The documented..."
+  },
+  {
+    "number": 205,
+    "title": "Apps Script API returns 401 \"invalid authentication credentials\" while Drive API works with same credentials",
+    "labels": [
+      "area: auth"
+    ],
+    "updatedAt": "2026-03-06T01:20:33Z",
+    "body_snippet": "gws version: 0.4.4 OS: macOS (Apple Silicon, MacBook Pro) Account type: Personal @gmail.com Description After authenticating with gws auth login --scopes https://www.googleapis.com/auth/drive,https://..."
+  },
+  {
+    "number": 197,
+    "title": "Doesn't support Advanced Protection Program users",
+    "labels": [
+      "area: auth"
+    ],
+    "updatedAt": "2026-03-14T00:53:12Z",
+    "body_snippet": "This may be out of scope, this app doesn't support [Advanced Protection Program](https://landing.google.com/intl/en_in/advancedprotection/) users, with a failure during authentication:  <img width=\"96..."
+  },
+  {
+    "number": 163,
+    "title": "Any plan to support Google Photos?",
+    "labels": [
+      "area: discovery"
+    ],
+    "updatedAt": "2026-03-05T20:48:15Z",
+    "body_snippet": "Does this project plan to support browsing Google Photos on the CLI? It would be nice to do analyses on photos using LLMs...."
+  },
+  {
+    "number": 158,
+    "title": "Add built in HITL that the agents can't edit in code",
+    "labels": [
+      "area: mcp"
+    ],
+    "updatedAt": "2026-03-05T20:38:09Z",
+    "body_snippet": "Add an option to make HITL / requests gateway so those of us that are using agents and want to gatekeep them for oauth and write actions can do it..."
+  },
+  {
+    "number": 157,
+    "title": "\"Something went wrong\" in oauth screen",
+    "labels": [
+      "area: auth"
+    ],
+    "updatedAt": "2026-03-05T20:37:48Z",
+    "body_snippet": "I can't get `npx -y @googleworkspace/cli@latest auth login` to work properly. I triple checked the settings of my auth: * Status: testing * User type: external * Test user: includes myself * Client ID..."
+  },
+  {
+    "number": 153,
+    "title": "[Security] Windows: encryption key written to plaintext file with no access controls",
+    "labels": [
+      "area: auth"
+    ],
+    "updatedAt": "2026-03-07T16:08:16Z",
+    "body_snippet": "## Description  On Windows, the `.encryption_key` fallback path in `credential_store.rs` writes the AES-256-GCM encryption key as a plaintext file with no access controls applied.  On Unix, the key fi..."
+  },
+  {
+    "number": 90,
+    "title": "Feature request: Homebrew Formula",
+    "labels": [
+      "area: distribution"
+    ],
+    "updatedAt": "2026-03-05T20:38:12Z",
+    "body_snippet": "It would be convenient to be able to install this tool using Homebrew \ud83d\ude04 ..."
+  },
+  {
+    "number": 82,
+    "title": "Optimisation: 40 skills => less skills + references",
+    "labels": [
+      "area: skills"
+    ],
+    "updatedAt": "2026-03-06T01:20:35Z",
+    "body_snippet": "Hi! I love skills. But I also hate how they create issues for agents.  Context pollution is real and I can already see that some of skills included in the repo cross-reference other skills. Problem wi..."
+  }
+]

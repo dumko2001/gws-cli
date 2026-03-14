@@ -14,7 +14,7 @@
 
 //! File-system utilities.
 
-use std::io;
+use std::io::{self, Write};
 use std::path::Path;
 
 /// Write `data` to `path` atomically.
@@ -40,7 +40,20 @@ pub fn atomic_write(path: &Path, data: &[u8]) -> io::Result<()> {
         .map(|p| p.join(&tmp_name))
         .unwrap_or_else(|| std::path::PathBuf::from(&tmp_name));
 
-    std::fs::write(&tmp_path, data)?;
+    let mut options = std::fs::OpenOptions::new();
+    options.write(true).create(true).truncate(true);
+
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::OpenOptionsExt;
+        options.mode(0o600);
+    }
+
+    let mut file = options.open(&tmp_path)?;
+    file.write_all(data)?;
+    file.sync_all()?; // Ensure bits hit disk before rename
+    drop(file);
+
     std::fs::rename(&tmp_path, path)?;
     Ok(())
 }
@@ -56,7 +69,21 @@ pub async fn atomic_write_async(path: &Path, data: &[u8]) -> io::Result<()> {
         .map(|p| p.join(&tmp_name))
         .unwrap_or_else(|| std::path::PathBuf::from(&tmp_name));
 
-    tokio::fs::write(&tmp_path, data).await?;
+    let mut options = tokio::fs::OpenOptions::new();
+    options.write(true).create(true).truncate(true);
+
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::OpenOptionsExt;
+        options.mode(0o600);
+    }
+
+    let mut file = options.open(&tmp_path).await?;
+    use tokio::io::AsyncWriteExt;
+    file.write_all(data).await?;
+    file.sync_all().await?;
+    drop(file);
+
     tokio::fs::rename(&tmp_path, path).await?;
     Ok(())
 }
@@ -98,5 +125,18 @@ mod tests {
         let path = dir.path().join("token_cache.json");
         atomic_write_async(&path, b"async hello").await.unwrap();
         assert_eq!(fs::read(&path).unwrap(), b"async hello");
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn test_atomic_write_permissions() {
+        use std::os::unix::fs::MetadataExt;
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("secure.txt");
+        atomic_write(&path, b"secret").unwrap();
+        let metadata = fs::metadata(&path).unwrap();
+        let mode = metadata.mode();
+        // Check that mode & 0o777 is 0o600
+        assert_eq!(mode & 0o777, 0o600);
     }
 }
