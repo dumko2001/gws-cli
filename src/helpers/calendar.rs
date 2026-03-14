@@ -80,14 +80,21 @@ impl Helper for CalendarHelper {
                         .value_name("EMAIL")
                         .action(ArgAction::Append),
                 )
+                .arg(
+                    Arg::new("meet")
+                        .long("meet")
+                        .help("Add a Google Meet video conference link")
+                        .action(ArgAction::SetTrue),
+                )
                 .after_help("\
 EXAMPLES:
   gws calendar +insert --summary 'Standup' --start '2026-06-17T09:00:00-07:00' --end '2026-06-17T09:30:00-07:00'
   gws calendar +insert --summary 'Review' --start ... --end ... --attendee alice@example.com
+  gws calendar +insert --summary 'Meet' --start ... --end ... --meet
 
 TIPS:
   Use RFC3339 format for times (e.g. 2026-06-17T09:00:00-07:00).
-  For recurring events or conference links, use the raw API instead."),
+  Google Meet generation requires the 'conferenceDataVersion=1' API flag."),
         );
         cmd = cmd.subcommand(
             Command::new("+agenda")
@@ -453,13 +460,24 @@ fn build_insert_request(
         body["attendees"] = json!(attendees_list);
     }
 
+    let mut params = json!({
+        "calendarId": calendar_id
+    });
+
+    if matches.get_flag("meet") {
+        body["conferenceData"] = json!({
+            "createRequest": {
+                "requestId": uuid::Uuid::new_v4().to_string(),
+                "conferenceSolutionKey": { "type": "hangoutsMeet" }
+            }
+        });
+        params["conferenceDataVersion"] = json!(1);
+    }
+
     let body_str = body.to_string();
     let scopes: Vec<String> = insert_method.scopes.iter().map(|s| s.to_string()).collect();
 
     // events.insert requires 'calendarId' path parameter
-    let params = json!({
-        "calendarId": calendar_id
-    });
     let params_str = params.to_string();
 
     Ok((params_str, body_str, scopes))
