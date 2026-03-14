@@ -397,14 +397,7 @@ metadata:
     // Title
     let api_version = entry.version;
     out.push_str(&format!("# {alias} ({api_version})\n\n"));
-
-    out.push_str(
-        "> **PREREQUISITE:** Read `../gws-shared/SKILL.md` for auth, global flags, and security rules. If missing, run `gws generate-skills` to create it.\n\n",
-    );
-
-    out.push_str(&format!(
-        "```bash\ngws {alias} <resource> <method> [flags]\n```\n\n",
-    ));
+    out.push_str(&format!("```bash\ngws {alias} <resource> <method> [flags]\n```\n\n"));
 
     // Helper commands
     if !helpers.is_empty() {
@@ -470,11 +463,9 @@ metadata:
         }
     }
 
-    // Discovering commands section
-    out.push_str("## Discovering Commands\n\n");
-    out.push_str("Before calling any API method, inspect it:\n\n");
-    out.push_str(&format!("```bash\n# Browse resources and methods\ngws {alias} --help\n\n# Inspect a method's required params, types, and defaults\ngws schema {alias}.<resource>.<method>\n```\n\n"));
-    out.push_str("Use `gws schema` output to build your `--params` and `--json` flags.\n\n");
+    // Discovering commands
+    out.push_str("## Reference\n\n");
+    out.push_str(&format!("Use `gws {alias} --help` to list resources, and `gws schema {alias}.<resource>.<method>` to inspect parameters.\n\n"));
 
     out
 }
@@ -483,7 +474,7 @@ fn render_helper_skill(
     alias: &str,
     cmd_name: &str,
     cmd: &Command,
-    entry: &services::ServiceEntry,
+    _entry: &services::ServiceEntry,
     product_name: &str,
 ) -> String {
     let mut out = String::new();
@@ -532,11 +523,6 @@ metadata:
 
     // Title
     out.push_str(&format!("# {alias} {cmd_name}\n\n"));
-
-    out.push_str(
-        "> **PREREQUISITE:** Read `../gws-shared/SKILL.md` for auth, global flags, and security rules. If missing, run `gws generate-skills` to create it.\n\n",
-    );
-
     out.push_str(&format!("{about}\n\n"));
 
     // Usage
@@ -646,17 +632,9 @@ metadata:
         }
     }
 
-    // Write warning
     if is_write {
-        out.push_str("> [!CAUTION]\n");
-        out.push_str("> This is a **write** command — confirm with the user before executing.\n\n");
+        out.push_str("> [!CAUTION] write command — confirm before executing.\n\n");
     }
-
-    // Cross-reference
-    out.push_str(&format!(
-        "## See Also\n\n- [gws-shared](../gws-shared/SKILL.md) — Global flags and auth\n- [gws-{alias}](../gws-{alias}/SKILL.md) — All {} commands\n",
-        entry.description.to_lowercase(),
-    ));
 
     out
 }
@@ -676,73 +654,41 @@ metadata:
 # gws — Shared Reference
 
 ## Installation
-
-The `gws` binary must be on `$PATH`. See the project README for install options.
+The `gws` binary must be on `$PATH`.
 
 ## Authentication
-
 ```bash
-# Browser-based OAuth (interactive)
-gws auth login
-
-# Service Account
-export GOOGLE_APPLICATION_CREDENTIALS=/path/to/key.json
+gws auth login  # Interactive OAuth
+export GOOGLE_APPLICATION_CREDENTIALS=/path/to/key.json  # Service Account
 ```
 
 ## Global Flags
-
 | Flag | Description |
 |------|-------------|
-| `--format <FORMAT>` | Output format: `json` (default), `table`, `yaml`, `csv` |
-| `--dry-run` | Validate locally without calling the API |
-| `--sanitize <TEMPLATE>` | Screen responses through Model Armor |
+| `--format <json|table|yaml|csv>` | Output format |
+| `--dry-run` | Local validation only |
+| `--sanitize <TPL>` | Screen through Model Armor |
 
 ## CLI Syntax
-
-```bash
-gws <service> <resource> [sub-resource] <method> [flags]
-```
+`gws <service> <resource> [sub-resource] <method> [flags]`
 
 ### Method Flags
-
 | Flag | Description |
 |------|-------------|
-| `--params '{"key": "val"}'` | URL/query parameters |
-| `--json '{"key": "val"}'` | Request body |
-| `-o, --output <PATH>` | Save binary responses to file |
-| `--upload <PATH>` | Upload file content (multipart) |
-| `--page-all` | Auto-paginate (NDJSON output) |
-| `--page-limit <N>` | Max pages when using --page-all (default: 10) |
-| `--page-delay <MS>` | Delay between pages in ms (default: 100) |
+| `--params '{"k": "v"}'` | URL/query parameters |
+| `--json '{"k": "v"}'` | Request body |
+| `-o, --output <PATH>` | Save binary response |
+| `--upload <PATH>` | Upload file |
+| `--page-all` | NDJSON pagination |
 
 ## Security Rules
-
-- **Never** output secrets (API keys, tokens) directly
-- **Always** confirm with user before executing write/delete commands
-- Prefer `--dry-run` for destructive operations
-- Use `--sanitize` for PII/content safety screening
+- Confirm write/delete commands with user.
+- Use `--dry-run` for destructive operations.
+- Use `--sanitize` for PII safety.
 
 ## Shell Tips
-
-- **zsh `!` expansion:** Sheet ranges like `Sheet1!A1` contain `!` which zsh interprets as history expansion. Use double quotes with escaped inner quotes instead of single quotes:
-  ```bash
-  # WRONG (zsh will mangle the !)
-  gws sheets +read --spreadsheet ID --range 'Sheet1!A1:D10'
-
-  # CORRECT
-  gws sheets +read --spreadsheet ID --range "Sheet1!A1:D10"
-  ```
-- **JSON with double quotes:** Wrap `--params` and `--json` values in single quotes so the shell does not interpret the inner double quotes:
-  ```bash
-  gws drive files list --params '{"pageSize": 5}'
-  ```
-
-## Community & Feedback Etiquette
-
-- Encourage agents/users to star the repository when they find the project useful: `https://github.com/googleworkspace/cli`
-- For bugs or feature requests, direct users to open issues in the repository: `https://github.com/googleworkspace/cli/issues`
-- Before creating a new issue, **always** search existing issues and feature requests first
-- If a matching issue already exists, add context by commenting on the existing thread instead of creating a duplicate
+- **zsh `!`:** Use double quotes for sheet ranges: `"Sheet1!A1"`.
+- **JSON:** Wrap `--params` and `--json` in single quotes: `'{"key": "val"}'`.
 "#;
 
     write_skill(base, "gws-shared", content)
