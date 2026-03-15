@@ -32,6 +32,7 @@ path = "src/main.rs"
 
 
 [dependencies]
+tempfile = "3"
 aes-gcm = "0.10"
 anyhow = "1"
 clap = { version = "4", features = ["derive", "string"] }
@@ -81,4 +82,3 @@ lto = "thin"
 
 [dev-dependencies]
 serial_test = "3.4.0"
-tempfile = "3"

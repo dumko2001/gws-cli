@@ -61,29 +61,11 @@ fn save_key_file_exclusive(path: &std::path::Path, b64_key: &str) -> std::io::Re
 
 /// Persist the base64-encoded encryption key to a local file with restrictive
 /// permissions (0600 file, 0700 directory). Overwrites any existing file.
+/// Persist the base64-encoded encryption key to a local file with restrictive
+/// permissions. Uses atomic_write to prevent TOCTOU/symlink race conditions.
 fn save_key_file(path: &std::path::Path, b64_key: &str) -> std::io::Result<()> {
-    use std::io::Write;
-    ensure_key_dir(path)?;
-
-    #[cfg(unix)]
-    {
-        use std::os::unix::fs::OpenOptionsExt;
-        let mut options = std::fs::OpenOptions::new();
-        options.write(true).create(true).truncate(true).mode(0o600);
-        let mut file = options.open(path)?;
-        file.write_all(b64_key.as_bytes())?;
-        file.sync_all()?; // fsync: ensure key is durable before returning
-    }
-    #[cfg(not(unix))]
-    {
-        std::fs::write(path, b64_key)?;
-    }
-    Ok(())
+    crate::fs_util::atomic_write(path, b64_key.as_bytes())
 }
-
-/// Read and decode a base64-encoded 256-bit key from a file.
-///
-/// On Unix, warns if the file is world-readable (mode & 0o077 != 0).
 fn read_key_file(path: &std::path::Path) -> Option<[u8; 32]> {
     use base64::{engine::general_purpose::STANDARD, Engine as _};
 
@@ -399,18 +381,6 @@ pub fn save_encrypted(json: &str) -> anyhow::Result<PathBuf> {
     // file is never left in a corrupt partial-write state on crash/Ctrl-C.
     crate::fs_util::atomic_write(&path, &encrypted)
         .map_err(|e| anyhow::anyhow!("Failed to write credentials: {e}"))?;
-
-    // Set permissions to 600 on Unix (contains secrets)
-    #[cfg(unix)]
-    {
-        use std::os::unix::fs::PermissionsExt;
-        if let Err(e) = std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o600)) {
-            eprintln!(
-                "Warning: failed to set file permissions on {}: {e}",
-                path.display()
-            );
-        }
-    }
 
     Ok(path)
 }
