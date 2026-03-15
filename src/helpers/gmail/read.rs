@@ -21,15 +21,20 @@ pub(super) async fn handle_read(
 ) -> Result<(), GwsError> {
     let message_id = matches
         .get_one::<String>("id")
-        .or(matches.get_one::<String>("message-id"))
         .unwrap();
 
-    let t = auth::get_token(&[GMAIL_READONLY_SCOPE])
-        .await
-        .map_err(|e| GwsError::Auth(format!("Gmail auth failed: {e}")))?;
-    
-    let client = crate::client::build_client()?;
-    let original = fetch_message_metadata(&client, &t, message_id).await?;
+    let dry_run = matches.get_flag("dry-run");
+
+    let original = if dry_run {
+        OriginalMessage::dry_run_placeholder(message_id)
+    } else {
+        let t = auth::get_token(&[GMAIL_READONLY_SCOPE])
+            .await
+            .map_err(|e| GwsError::Auth(format!("Gmail auth failed: {e}")))?;
+
+        let client = crate::client::build_client()?;
+        fetch_message_metadata(&client, &t, message_id).await?
+    };
 
     let format = matches.get_one::<String>("format").unwrap();
     let show_headers = matches.get_flag("headers");
@@ -38,7 +43,8 @@ pub(super) async fn handle_read(
     if format == "json" {
         println!(
             "{}",
-            serde_json::to_string_pretty(&original).map_err(|e| GwsError::Other(anyhow::anyhow!(e)))?
+            serde_json::to_string_pretty(&original)
+                .map_err(|e| GwsError::Other(anyhow::anyhow!(e)))?
         );
         return Ok(());
     }
