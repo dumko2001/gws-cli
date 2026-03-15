@@ -555,9 +555,13 @@ mod tests {
         ]);
         let (params, body, _) = build_insert_request(&matches, &doc).unwrap();
 
-        assert!(params.contains("\"conferenceDataVersion\":1"));
-        assert!(body.contains("\"conferenceSolutionKey\":{\"type\":\"hangoutsMeet\"}"));
-        assert!(body.contains("\"requestId\":"));
+        let params_json: serde_json::Value = serde_json::from_str(&params).unwrap();
+        assert_eq!(params_json["conferenceDataVersion"], 1);
+
+        let body_json: serde_json::Value = serde_json::from_str(&body).unwrap();
+        let create_req = &body_json["conferenceData"]["createRequest"];
+        assert_eq!(create_req["conferenceSolutionKey"]["type"], "hangoutsMeet");
+        assert!(uuid::Uuid::parse_str(create_req["requestId"].as_str().unwrap()).is_ok());
     }
 
     #[test]
