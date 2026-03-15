@@ -207,7 +207,7 @@ async fn run() -> Result<(), GwsError> {
     }
 
     // Walk the subcommand tree to find the target method
-    let (method, matched_args) = resolve_method_from_matches(&doc, &matches)?;
+    let (method, matched_args, method_path) = resolve_method_from_matches(&doc, &matches)?;
 
     let params_json = matched_args.get_one::<String>("params").map(|s| s.as_str());
     let body_json = matched_args
@@ -228,6 +228,22 @@ async fn run() -> Result<(), GwsError> {
         .map(|s| s.as_str());
 
     let dry_run = matched_args.get_flag("dry-run");
+    let draft_only = matches.get_flag("draft-only");
+    if draft_only && !dry_run && api_name == "gmail" {
+        let is_send_method = if let Some(ref id) = method.id {
+            id == "gmail.users.messages.send" || id == "gmail.users.drafts.send"
+        } else {
+            // Fallback to path if ID is missing (suggested by previous review for robustness)
+            method_path.len() == 3
+                && method_path[0] == "users"
+                && (method_path[1] == "messages" || method_path[1] == "drafts")
+                && method_path[2] == "send"
+        };
+
+        if is_send_method {
+            return Err(GwsError::Validation("Gmail draft-only mode is active. Sending mail is blocked (preparing a draft is still allowed).".to_string()));
+        }
+    }
 
     // Build pagination config from flags
     let pagination = parse_pagination_config(matched_args);
@@ -361,13 +377,13 @@ fn parse_sanitize_config(
 fn resolve_method_from_matches<'a>(
     doc: &'a discovery::RestDescription,
     matches: &'a clap::ArgMatches,
-) -> Result<(&'a discovery::RestMethod, &'a clap::ArgMatches), GwsError> {
+) -> Result<(&'a discovery::RestMethod, &'a clap::ArgMatches, Vec<String>), GwsError> {
     // Walk the subcommand chain
-    let mut path: Vec<&str> = Vec::new();
+    let mut path: Vec<String> = Vec::new();
     let mut current_matches = matches;
 
     while let Some((sub_name, sub_matches)) = current_matches.subcommand() {
-        path.push(sub_name);
+        path.push(sub_name.to_string());
         current_matches = sub_matches;
     }
 
@@ -379,7 +395,7 @@ fn resolve_method_from_matches<'a>(
 
     // path looks like ["files", "list"] or ["files", "permissions", "list"]
     // Walk the Discovery Document resources to find the method
-    let resource_name = path[0];
+    let resource_name = &path[0];
     let resource = doc
         .resources
         .get(resource_name)
@@ -388,7 +404,7 @@ fn resolve_method_from_matches<'a>(
     let mut current_resource = resource;
 
     // Navigate sub-resources (everything except the last element, which is the method)
-    for &name in &path[1..path.len() - 1] {
+    for name in &path[1..path.len() - 1] {
         // Check if this is a sub-resource
         if let Some(sub) = current_resource.resources.get(name) {
             current_resource = sub;
@@ -400,11 +416,11 @@ fn resolve_method_from_matches<'a>(
     }
 
     // The last element is the method name
-    let method_name = path[path.len() - 1];
+    let method_name = &path[path.len() - 1];
 
     // Check if this is a method on the current resource
     if let Some(method) = current_resource.methods.get(method_name) {
-        return Ok((method, current_matches));
+        return Ok((method, current_matches, path));
     }
 
     // Maybe it's a resource that has methods — need one more subcommand
@@ -485,6 +501,9 @@ fn print_usage() {
     println!("    Star the repo: https://github.com/googleworkspace/cli");
     println!("    Report bugs / request features: https://github.com/googleworkspace/cli/issues");
     println!("    Please search existing issues first; if one already exists, comment there.");
+    println!();
+    println!("DISCLAIMER:");
+    println!("    This is not an officially supported Google product.");
     println!();
     println!("DISCLAIMER:");
     println!("    This is not an officially supported Google product.");
@@ -622,8 +641,9 @@ mod tests {
             .subcommand(clap::Command::new("files").subcommand(clap::Command::new("list")));
 
         let matches = cmd.get_matches_from(vec!["gws", "files", "list"]);
-        let (method, _) = resolve_method_from_matches(&doc, &matches).unwrap();
+        let (method, _, method_path) = resolve_method_from_matches(&doc, &matches).unwrap();
         assert_eq!(method.id.as_deref(), Some("drive.files.list"));
+        assert_eq!(method_path, vec!["files", "list"]);
     }
 
     #[test]
@@ -655,8 +675,9 @@ mod tests {
             ));
 
         let matches = cmd.get_matches_from(vec!["gws", "files", "permissions", "get"]);
-        let (method, _) = resolve_method_from_matches(&doc, &matches).unwrap();
+        let (method, _, method_path) = resolve_method_from_matches(&doc, &matches).unwrap();
         assert_eq!(method.id.as_deref(), Some("drive.files.permissions.get"));
+        assert_eq!(method_path, vec!["files", "permissions", "get"]);
     }
 
     #[test]
