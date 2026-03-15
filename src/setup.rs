@@ -374,36 +374,7 @@ pub struct SetupOptions {
     pub project: Option<String>,
     pub dry_run: bool,
     pub login: bool,
-}
-
-/// Parse setup flags from args.
-pub fn parse_setup_args(args: &[String]) -> SetupOptions {
-    let mut project = None;
-    let mut dry_run = false;
-    let mut login = false;
-    let mut i = 0;
-    while i < args.len() {
-        if args[i] == "--project" && i + 1 < args.len() {
-            project = Some(args[i + 1].clone());
-            i += 2;
-        } else if args[i].starts_with("--project=") {
-            project = Some(args[i].split_once('=').unwrap().1.to_string());
-            i += 1;
-        } else if args[i] == "--dry-run" {
-            dry_run = true;
-            i += 1;
-        } else if args[i] == "--login" {
-            login = true;
-            i += 1;
-        } else {
-            i += 1;
-        }
-    }
-    SetupOptions {
-        project,
-        dry_run,
-        login,
-    }
+    pub account: Option<String>,
 }
 
 // ── gcloud helpers ──────────────────────────────────────────────
@@ -1598,8 +1569,7 @@ fn prompt_login_after_setup() -> Result<bool, GwsError> {
 }
 
 /// Run the full setup flow. Orchestrates all steps and outputs JSON summary.
-pub async fn run_setup(args: &[String], account: Option<&str>) -> Result<(), GwsError> {
-    let opts = parse_setup_args(args);
+pub async fn run_setup(opts: SetupOptions) -> Result<(), GwsError> {
     let dry_run = opts.dry_run;
     let interactive = std::io::IsTerminal::is_terminal(&std::io::stdin()) && !dry_run;
 
@@ -1620,15 +1590,15 @@ pub async fn run_setup(args: &[String], account: Option<&str>) -> Result<(), Gws
         wizard,
         interactive,
         dry_run,
-        opts,
-        account: String::new(),
-        project_id: String::new(),
+        account: opts.account.clone().unwrap_or_default(),
+        project_id: opts.project.clone().unwrap_or_default(),
         api_ids: Vec::new(),
         client_id: String::new(),
         client_secret: String::new(),
         enabled: Vec::new(),
         skipped: Vec::new(),
         failed: Vec::new(),
+        opts,
     };
 
     let mut stage = SetupStage::CheckGcloud;
@@ -1683,7 +1653,8 @@ pub async fn run_setup(args: &[String], account: Option<&str>) -> Result<(), Gws
     eprintln!("\n✅ {message}");
 
     if run_login {
-        crate::auth_commands::run_login(&[], account).await?;
+        crate::auth_commands::run_login(crate::auth_commands::LoginOptions::default(), Some(&ctx.account))
+            .await?;
     }
 
     Ok(())
@@ -1823,64 +1794,6 @@ mod tests {
     }
 
     // ── parse_setup_args tests ──────────────────────────────────
-
-    #[test]
-    fn test_parse_setup_args_empty() {
-        let opts = parse_setup_args(&[]);
-        assert!(opts.project.is_none());
-        assert!(!opts.dry_run);
-        assert!(!opts.login);
-    }
-
-    #[test]
-    fn test_parse_setup_args_with_project() {
-        let args = vec!["--project".into(), "my-project".into()];
-        let opts = parse_setup_args(&args);
-        assert_eq!(opts.project.as_deref(), Some("my-project"));
-        assert!(!opts.login);
-    }
-
-    #[test]
-    fn test_parse_setup_args_with_project_equals() {
-        let args = vec!["--project=my-project".into()];
-        let opts = parse_setup_args(&args);
-        assert_eq!(opts.project.as_deref(), Some("my-project"));
-        assert!(!opts.login);
-    }
-
-    #[test]
-    fn test_parse_setup_args_ignores_unknown() {
-        let args = vec!["--verbose".into(), "--unknown".into()];
-        let opts = parse_setup_args(&args);
-        assert!(opts.project.is_none());
-        assert!(!opts.login);
-    }
-
-    #[test]
-    fn test_parse_setup_args_dry_run() {
-        let args = vec!["--dry-run".into()];
-        let opts = parse_setup_args(&args);
-        assert!(opts.dry_run);
-        assert!(!opts.login);
-    }
-
-    #[test]
-    fn test_parse_setup_args_dry_run_with_project() {
-        let args: Vec<String> = vec!["--dry-run".into(), "--project".into(), "p".into()];
-        let opts = parse_setup_args(&args);
-        assert!(opts.dry_run);
-        assert_eq!(opts.project.as_deref(), Some("p"));
-        assert!(!opts.login);
-    }
-
-    #[test]
-    fn test_parse_setup_args_login_flag() {
-        let args: Vec<String> = vec!["--login".into()];
-        let opts = parse_setup_args(&args);
-        assert!(opts.login);
-        assert!(!opts.dry_run);
-        assert!(opts.project.is_none());
-    }
 
     #[test]
     fn test_should_offer_login_prompt_default_interactive() {
