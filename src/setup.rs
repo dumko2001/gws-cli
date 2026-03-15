@@ -1598,7 +1598,7 @@ fn prompt_login_after_setup() -> Result<bool, GwsError> {
 }
 
 /// Run the full setup flow. Orchestrates all steps and outputs JSON summary.
-pub async fn run_setup(args: &[String]) -> Result<(), GwsError> {
+pub async fn run_setup(args: &[String], account: Option<&str>) -> Result<(), GwsError> {
     let opts = parse_setup_args(args);
     let dry_run = opts.dry_run;
     let interactive = std::io::IsTerminal::is_terminal(&std::io::stdin()) && !dry_run;
@@ -1683,7 +1683,7 @@ pub async fn run_setup(args: &[String]) -> Result<(), GwsError> {
     eprintln!("\n✅ {message}");
 
     if run_login {
-        crate::auth_commands::run_login(&[], None).await?;
+        crate::auth_commands::run_login(&[], account).await?;
     }
 
     Ok(())

@@ -166,29 +166,22 @@ pub async fn get_token(scopes: &[&str], account: Option<&str>) -> anyhow::Result
     }
 
     let creds_file = std::env::var("GOOGLE_WORKSPACE_CLI_CREDENTIALS_FILE").ok();
-    let config_dir = crate::auth_commands::config_dir();
-
-    let tc_filename = if let Some(acc) = account {
-        format!("token_cache.{acc}.json")
-    } else {
-        "token_cache.json".to_string()
-    };
-    let token_cache = config_dir.join(tc_filename);
 
     let creds = load_credentials_inner(creds_file.as_deref(), account).await?;
-    get_token_inner(scopes, creds, &token_cache).await
+    get_token_inner(scopes, creds, account).await
 }
 
 async fn get_token_inner(
     scopes: &[&str],
     creds: Credential,
-    token_cache_path: &std::path::Path,
+    account: Option<&str>,
 ) -> anyhow::Result<String> {
     match creds {
         Credential::AuthorizedUser(secret) => {
+            let token_cache_path = crate::credential_store::token_cache_path(account);
             let auth = yup_oauth2::AuthorizedUserAuthenticator::builder(secret)
                 .with_storage(Box::new(crate::token_storage::EncryptedTokenStorage::new(
-                    token_cache_path.to_path_buf(),
+                    token_cache_path,
                 )))
                 .build()
                 .await
@@ -201,11 +194,7 @@ async fn get_token_inner(
                 .to_string())
         }
         Credential::ServiceAccount(key) => {
-            let tc_filename = token_cache_path
-                .file_name()
-                .map(|f| f.to_string_lossy().to_string())
-                .unwrap_or_else(|| "token_cache.json".to_string());
-            let sa_cache = token_cache_path.with_file_name(format!("sa_{tc_filename}"));
+            let sa_cache = crate::credential_store::sa_token_cache_path(account);
             let builder = yup_oauth2::ServiceAccountAuthenticator::builder(key).with_storage(
                 Box::new(crate::token_storage::EncryptedTokenStorage::new(sa_cache)),
             );
@@ -301,8 +290,11 @@ async fn load_credentials_inner(
                     );
                 }
                 // Also remove stale token caches that used the old key.
-                for cache_file in ["token_cache.json", "sa_token_cache.json"] {
-                    let path = enc_path.with_file_name(cache_file);
+                let cache_paths = [
+                    crate::credential_store::token_cache_path(account),
+                    crate::credential_store::sa_token_cache_path(account),
+                ];
+                for path in cache_paths {
                     if let Err(err) = tokio::fs::remove_file(&path).await {
                         if err.kind() != std::io::ErrorKind::NotFound {
                             eprintln!(
@@ -611,6 +603,7 @@ mod tests {
     }
 
     #[tokio::test]
+    #[serial_test::serial]
     async fn test_load_credentials_encrypted_file() {
         // Simulate an encrypted credentials file
         let json = r#"{
@@ -641,6 +634,7 @@ mod tests {
     }
 
     #[tokio::test]
+    #[serial_test::serial]
     async fn test_load_credentials_encrypted_takes_priority_over_default() {
         // Encrypted credentials should be loaded before the default plaintext path
         let enc_json = r#"{

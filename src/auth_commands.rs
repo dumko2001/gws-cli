@@ -223,7 +223,7 @@ pub async fn handle_auth_command(args: &[String]) -> Result<(), GwsError> {
             if sub.get_flag("login") {
                 setup_args.push("--login".to_string());
             }
-            crate::setup::run_setup(&setup_args).await
+            crate::setup::run_setup(&setup_args, account).await
         }
         Some(("status", _)) => handle_status(account).await,
         Some(("export", sub)) => {
@@ -352,7 +352,12 @@ async fn handle_login(args: &[String], account: Option<&str>) -> Result<(), GwsE
     }
 
     // Use a temp file for yup-oauth2's token persistence, then encrypt it
-    let temp_path = config_dir().join("credentials.tmp");
+    let temp_filename = if let Some(acc) = account {
+        format!("credentials.{acc}.tmp")
+    } else {
+        "credentials.tmp".to_string()
+    };
+    let temp_path = config_dir().join(temp_filename);
 
     // Always start fresh — delete any stale temp cache from prior login attempts.
     let _ = std::fs::remove_file(&temp_path);
