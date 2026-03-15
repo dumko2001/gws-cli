@@ -516,11 +516,7 @@ mod tests {
                     .long("attendee")
                     .action(ArgAction::Append),
             )
-            .arg(
-                Arg::new("meet")
-                    .long("meet")
-                    .action(ArgAction::SetTrue),
-            );
+            .arg(Arg::new("meet").long("meet").action(ArgAction::SetTrue));
         cmd.try_get_matches_from(args).unwrap()
     }
 

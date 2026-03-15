@@ -23,6 +23,7 @@ use crossterm::{
     terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
     ExecutableCommand,
 };
+use ratatui::prelude::Stylize;
 use ratatui::{
     layout::{Constraint, Layout},
     style::{Color, Modifier, Style},
@@ -30,7 +31,6 @@ use ratatui::{
     widgets::{Block, Borders, List, ListItem, ListState, Paragraph},
     DefaultTerminal,
 };
-use ratatui::prelude::Stylize;
 use std::io::stdout;
 
 /// An item in the multi-select list.
