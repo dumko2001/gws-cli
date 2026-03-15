@@ -325,7 +325,7 @@ async fn handle_login(args: &[String]) -> Result<(), GwsError> {
     .with_storage(Box::new(crate::token_storage::EncryptedTokenStorage::new(
         temp_path.clone(),
     )))
-    .force_account_selection(true)
+    .force_account_selection(true) // Adds prompt=consent so Google always returns a refresh_token
     .flow_delegate(Box::new(CliFlowDelegate {
         login_hint: None,
         force_consent: is_readonly,
