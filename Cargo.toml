@@ -55,7 +55,7 @@ ratatui = "0.30.0"
 crossterm = "0.29.0"
 chrono = "0.4.44"
 chrono-tz = "0.10"
-uuid = { version = "1.8", features = ["v4"] }
+uuid = { version = "1.8", features = ["v4", "v5"] }
 iana-time-zone = "0.1"
 async-trait = "0.1.89"
 serde_yaml = "0.9.34"

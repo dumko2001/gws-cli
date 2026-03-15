@@ -465,9 +465,13 @@ fn build_insert_request(
     });
 
     if matches.get_flag("meet") {
+        let namespace = uuid::Uuid::NAMESPACE_DNS;
+        let seed_data = format!("{}:{}:{}", summary, start, end);
+        let request_id = uuid::Uuid::new_v5(&namespace, seed_data.as_bytes()).to_string();
+
         body["conferenceData"] = json!({
             "createRequest": {
-                "requestId": uuid::Uuid::new_v4().to_string(),
+                "requestId": request_id,
                 "conferenceSolutionKey": { "type": "hangoutsMeet" }
             }
         });
@@ -562,6 +566,35 @@ mod tests {
         let create_req = &body_json["conferenceData"]["createRequest"];
         assert_eq!(create_req["conferenceSolutionKey"]["type"], "hangoutsMeet");
         assert!(uuid::Uuid::parse_str(create_req["requestId"].as_str().unwrap()).is_ok());
+    }
+
+    #[test]
+    fn test_build_insert_request_with_meet_is_idempotent() {
+        let doc = make_mock_doc();
+        let args = &[
+            "test",
+            "--summary",
+            "Idempotent Meeting",
+            "--start",
+            "2024-01-01T10:00:00Z",
+            "--end",
+            "2024-01-01T11:00:00Z",
+            "--meet",
+        ];
+        let matches1 = make_matches_insert(args);
+        let (_, body1, _) = build_insert_request(&matches1, &doc).unwrap();
+
+        let matches2 = make_matches_insert(args);
+        let (_, body2, _) = build_insert_request(&matches2, &doc).unwrap();
+
+        let b1: serde_json::Value = serde_json::from_str(&body1).unwrap();
+        let b2: serde_json::Value = serde_json::from_str(&body2).unwrap();
+
+        assert_eq!(
+            b1["conferenceData"]["createRequest"]["requestId"],
+            b2["conferenceData"]["createRequest"]["requestId"],
+            "requestId should be deterministic for the same event details"
+        );
     }
 
     #[test]
