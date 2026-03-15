@@ -19,16 +19,48 @@ pub(super) async fn handle_read(
     _doc: &crate::discovery::RestDescription,
     matches: &ArgMatches,
 ) -> Result<(), GwsError> {
-    let message_id = matches.get_one::<String>("message-id").unwrap();
+    let message_id = matches
+        .get_one::<String>("id")
+        .or(matches.get_one::<String>("message-id"))
+        .unwrap();
 
-    let t = auth::get_token(&[GMAIL_SCOPE])
+    let t = auth::get_token(&[GMAIL_READONLY_SCOPE])
         .await
         .map_err(|e| GwsError::Auth(format!("Gmail auth failed: {e}")))?;
     
     let client = crate::client::build_client()?;
     let original = fetch_message_metadata(&client, &t, message_id).await?;
 
-    println!("{}", original.body_text);
+    let format = matches.get_one::<String>("format").unwrap();
+    let show_headers = matches.get_flag("headers");
+    let use_html = matches.get_flag("html");
+
+    if format == "json" {
+        println!(
+            "{}",
+            serde_json::to_string_pretty(&original).map_err(|e| GwsError::Other(anyhow::anyhow!(e)))?
+        );
+        return Ok(());
+    }
+
+    if show_headers {
+        println!("From: {}", original.from);
+        println!("To: {}", original.to);
+        if !original.cc.is_empty() {
+            println!("Cc: {}", original.cc);
+        }
+        println!("Subject: {}", original.subject);
+        println!("Date: {}", original.date);
+        println!("---");
+    }
+
+    let body = if use_html {
+        original.body_html.as_deref().unwrap_or(&original.body_text)
+    } else {
+        &original.body_text
+    };
+
+    println!("{}", body);
 
     Ok(())
 }

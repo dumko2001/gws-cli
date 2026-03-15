@@ -32,6 +32,8 @@ pub(super) use crate::executor;
 pub(super) use anyhow::Context;
 pub(super) use base64::{engine::general_purpose::URL_SAFE, Engine as _};
 pub(super) use clap::{Arg, ArgAction, ArgMatches, Command};
+pub(super) use serde::Serialize;
+
 pub(super) use serde_json::{json, Value};
 use std::future::Future;
 use std::pin::Pin;
@@ -41,6 +43,7 @@ pub struct GmailHelper;
 pub(super) const GMAIL_SCOPE: &str = "https://www.googleapis.com/auth/gmail.modify";
 pub(super) const GMAIL_READONLY_SCOPE: &str = "https://www.googleapis.com/auth/gmail.readonly";
 pub(super) const PUBSUB_SCOPE: &str = "https://www.googleapis.com/auth/pubsub";
+#[derive(Serialize)]
 
 pub(super) struct OriginalMessage {
     pub thread_id: String,
@@ -1009,22 +1012,51 @@ TIPS:
 
         cmd = cmd.subcommand(
             Command::new("+read")
-                .about("Extract plain-text body from a Gmail message")
+                .about("[Helper] Read a message and extract its body or headers")
                 .arg(
-                    Arg::new("message-id")
-                        .long("message-id")
+                    Arg::new("id")
+                        .long("id")
+                        .alias("message-id")
                         .required(true)
-                        .help("The ID of the message to read")
+                        .help("The Gmail message ID to read")
                         .value_name("ID"),
+                )
+                .arg(
+                    Arg::new("headers")
+                        .long("headers")
+                        .help("Include headers (From, To, Subject, Date) in the output")
+                        .action(ArgAction::SetTrue),
+                )
+                .arg(
+                    Arg::new("format")
+                        .long("format")
+                        .help("Output format (text, json)")
+                        .value_parser(["text", "json"])
+                        .default_value("text"),
+                )
+                .arg(
+                    Arg::new("html")
+                        .long("html")
+                        .help("Return HTML body instead of plain text")
+                        .action(ArgAction::SetTrue),
+                )
+                .arg(
+                    Arg::new("body-only")
+                        .long("body-only")
+                        .help("Only output the message body (default behavior)")
+                        .action(ArgAction::SetTrue)
+                        .conflicts_with("headers"),
                 )
                 .after_help(
                     "\
 EXAMPLES:
-  gws gmail +read --message-id 18f1a2b3c4d
+  gws gmail +read --id 18f1a2b3c4d
+  gws gmail +read --id 18f1a2b3c4d --headers
+  gws gmail +read --id 18f1a2b3c4d --format json | jq '.body'
 
 TIPS:
-  Converts HTML-only messages to plain text (markdown-like).
-  Handles multipart/alternative and base64 decoding automatically.",
+  Converts HTML-only messages to plain text automatically.
+  Handles multipart/alternative and base64 decoding.",
                 ),
         );
 
