@@ -213,8 +213,12 @@ impl yup_oauth2::authenticator_delegate::InstalledFlowDelegate for CliFlowDelega
                         .map(|i| pos + i)
                         .unwrap_or(display_url.len());
                     let current_prompt = &display_url[pos + 7..end_pos];
-                    if !current_prompt.contains("consent") {
-                        let new_prompt = format!("{}%20consent", current_prompt);
+                    if !current_prompt.split("%20").any(|p| p == "consent") {
+                        let new_prompt = if current_prompt.is_empty() {
+                            "consent".to_string()
+                        } else {
+                            format!("{}%20consent", current_prompt)
+                        };
                         display_url.replace_range(pos + 7..end_pos, &new_prompt);
                     }
                 } else if display_url.contains('?') {
