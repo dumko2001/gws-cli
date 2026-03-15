@@ -263,9 +263,8 @@ async fn load_credentials_inner(
     env_file: Option<&str>,
     account: Option<&str>,
 ) -> anyhow::Result<Credential> {
-    let config_dir = crate::auth_commands::config_dir();
     let enc_path = credential_store::encrypted_credentials_path(account);
-    let default_path = config_dir.join("credentials.json");
+    let default_path = credential_store::plain_credentials_path(account);
     // 1. Explicit env var — plaintext file (User or Service Account)
     if let Some(path) = env_file {
         let p = PathBuf::from(path);

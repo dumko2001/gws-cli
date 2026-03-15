@@ -380,6 +380,39 @@ pub fn encrypted_credentials_path(account: Option<&str>) -> PathBuf {
     crate::auth_commands::config_dir().join(filename)
 }
 
+/// Returns the path for plaintext credentials.
+pub fn plain_credentials_path(account: Option<&str>) -> PathBuf {
+    if let Ok(path) = std::env::var("GOOGLE_WORKSPACE_CLI_CREDENTIALS_FILE") {
+        return PathBuf::from(path);
+    }
+    let filename = if let Some(acc) = account {
+        format!("credentials.{acc}.json")
+    } else {
+        "credentials.json".to_string()
+    };
+    crate::auth_commands::config_dir().join(filename)
+}
+
+/// Returns the path for the user token cache.
+pub fn token_cache_path(account: Option<&str>) -> PathBuf {
+    let filename = if let Some(acc) = account {
+        format!("token_cache.{acc}.json")
+    } else {
+        "token_cache.json".to_string()
+    };
+    crate::auth_commands::config_dir().join(filename)
+}
+
+/// Returns the path for the service account token cache.
+pub fn sa_token_cache_path(account: Option<&str>) -> PathBuf {
+    let filename = if let Some(acc) = account {
+        format!("sa_token_cache.{acc}.json")
+    } else {
+        "sa_token_cache.json".to_string()
+    };
+    crate::auth_commands::config_dir().join(filename)
+}
+
 /// Saves credentials JSON to an encrypted file.
 pub fn save_encrypted(json: &str, account: Option<&str>) -> anyhow::Result<PathBuf> {
     let path = encrypted_credentials_path(account);

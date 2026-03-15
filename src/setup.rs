@@ -1471,9 +1471,10 @@ async fn stage_configure_oauth(ctx: &mut SetupContext) -> Result<SetupStage, Gws
     }
 
     let (cid_result, csecret_result) = if let Some(ref mut w) = ctx.wizard {
-        let current_creds: Option<serde_json::Value> = crate::credential_store::load_encrypted(None)
-            .ok()
-            .and_then(|s| serde_json::from_str(&s).ok());
+        let current_creds: Option<serde_json::Value> =
+            crate::credential_store::load_encrypted(None)
+                .ok()
+                .and_then(|s| serde_json::from_str(&s).ok());
 
         w.show_message(&format!(
             concat!(

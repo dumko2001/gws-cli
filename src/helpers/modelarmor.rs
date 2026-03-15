@@ -228,11 +228,23 @@ TIPS:
         Box::pin(async move {
             let account = matches.get_one::<String>("account");
             if let Some(sub) = matches.subcommand_matches("+sanitize-prompt") {
-                handle_sanitize(sub, "sanitizeUserPrompt", "userPromptData", account.map(|s| s.as_str())).await?;
+                handle_sanitize(
+                    sub,
+                    "sanitizeUserPrompt",
+                    "userPromptData",
+                    account.map(|s| s.as_str()),
+                )
+                .await?;
                 return Ok(true);
             }
             if let Some(sub) = matches.subcommand_matches("+sanitize-response") {
-                handle_sanitize(sub, "sanitizeModelResponse", "modelResponseData", account.map(|s| s.as_str())).await?;
+                handle_sanitize(
+                    sub,
+                    "sanitizeModelResponse",
+                    "modelResponseData",
+                    account.map(|s| s.as_str()),
+                )
+                .await?;
                 return Ok(true);
             }
             if let Some(sub) = matches.subcommand_matches("+create-template") {
@@ -248,7 +260,11 @@ pub const CLOUD_PLATFORM_SCOPE: &str = "https://www.googleapis.com/auth/cloud-pl
 
 /// Sanitize text through a Model Armor template and return the result.
 /// Template format: projects/PROJECT/locations/LOCATION/templates/TEMPLATE
-pub async fn sanitize_text(template: &str, text: &str, account: Option<&str>) -> Result<SanitizationResult, GwsError> {
+pub async fn sanitize_text(
+    template: &str,
+    text: &str,
+    account: Option<&str>,
+) -> Result<SanitizationResult, GwsError> {
     let (body, url) = build_sanitize_request_data(template, text, "sanitizeUserPrompt")?;
 
     let token = auth::get_token(&[CLOUD_PLATFORM_SCOPE], account)
@@ -380,7 +396,10 @@ pub fn build_create_template_url(config: &CreateTemplateConfig) -> String {
 }
 
 /// Handle +create-template
-async fn handle_create_template(matches: &ArgMatches, account: Option<&str>) -> Result<(), GwsError> {
+async fn handle_create_template(
+    matches: &ArgMatches,
+    account: Option<&str>,
+) -> Result<(), GwsError> {
     let config = parse_create_template_args(matches)?;
     let url = build_create_template_url(&config);
 

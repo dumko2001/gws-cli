@@ -159,10 +159,11 @@ TIPS:
 
                 let account = matches.get_one::<String>("account");
                 let scopes_str: Vec<&str> = scopes.iter().map(|s| s.as_str()).collect();
-                let (token, auth_method) = match auth::get_token(&scopes_str, account.map(|s| s.as_str())).await {
-                    Ok(t) => (Some(t), executor::AuthMethod::OAuth),
-                    Err(_) => (None, executor::AuthMethod::None),
-                };
+                let (token, auth_method) =
+                    match auth::get_token(&scopes_str, account.map(|s| s.as_str())).await {
+                        Ok(t) => (Some(t), executor::AuthMethod::OAuth),
+                        Err(_) => (None, executor::AuthMethod::None),
+                    };
 
                 let events_res = doc.resources.get("events").ok_or_else(|| {
                     GwsError::Discovery("Resource 'events' not found".to_string())
@@ -215,7 +216,13 @@ async fn handle_agenda(matches: &ArgMatches) -> Result<(), GwsError> {
 
     let client = crate::client::build_client()?;
     let tz_override = matches.get_one::<String>("timezone").map(|s| s.as_str());
-    let tz = crate::timezone::resolve_account_timezone(&client, &token, tz_override, account.map(|s| s.as_str())).await?;
+    let tz = crate::timezone::resolve_account_timezone(
+        &client,
+        &token,
+        tz_override,
+        account.map(|s| s.as_str()),
+    )
+    .await?;
 
     // Determine time range using the account timezone so that --today and
     // --tomorrow align with the user's Google account day, not the machine.

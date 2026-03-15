@@ -650,7 +650,7 @@ pub(super) async fn send_raw_email(
         Some(t) => (Some(t.to_string()), executor::AuthMethod::OAuth),
         None => {
             let scopes: Vec<&str> = send_method.scopes.iter().map(|s| s.as_str()).collect();
-            let scope_strs: Vec<&str> = scopes.iter().copied().collect();
+            let scope_strs: Vec<&str> = scopes.to_vec();
             match auth::get_token(&scope_strs, account.map(|s| s.as_str())).await {
                 Ok(t) => (Some(t), executor::AuthMethod::OAuth),
                 Err(_) if matches.get_flag("dry-run") => (None, executor::AuthMethod::None),

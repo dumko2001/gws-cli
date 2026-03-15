@@ -17,7 +17,9 @@ use std::path::PathBuf;
 
 use serde_json::json;
 
-use crate::credential_store;
+use crate::credential_store::{
+    self, plain_credentials_path, sa_token_cache_path, token_cache_path,
+};
 use crate::error::GwsError;
 
 /// Mask a secret string by showing only the first 4 and last 4 characters.
@@ -117,36 +119,6 @@ pub fn config_dir() -> PathBuf {
     primary
 }
 
-fn plain_credentials_path(account: Option<&str>) -> PathBuf {
-    if let Ok(path) = std::env::var("GOOGLE_WORKSPACE_CLI_CREDENTIALS_FILE") {
-        return PathBuf::from(path);
-    }
-    let filename = if let Some(acc) = account {
-        format!("credentials.{acc}.json")
-    } else {
-        "credentials.json".to_string()
-    };
-    config_dir().join(filename)
-}
-
-fn token_cache_path(account: Option<&str>) -> PathBuf {
-    let filename = if let Some(acc) = account {
-        format!("token_cache.{acc}.json")
-    } else {
-        "token_cache.json".to_string()
-    };
-    config_dir().join(filename)
-}
-
-fn sa_token_cache_path(account: Option<&str>) -> PathBuf {
-    let filename = if let Some(acc) = account {
-        format!("sa_token_cache.{acc}.json")
-    } else {
-        "sa_token_cache.json".to_string()
-    };
-    config_dir().join(filename)
-}
-
 /// Handle `gws auth <subcommand>`.
 pub async fn handle_auth_command(args: &[String]) -> Result<(), GwsError> {
     use clap::{Arg, Command};
@@ -165,26 +137,60 @@ pub async fn handle_auth_command(args: &[String]) -> Result<(), GwsError> {
         .subcommand(
             Command::new("login")
                 .about("Authenticate via OAuth2 (opens browser)")
-                .arg(Arg::new("readonly").long("readonly").action(clap::ArgAction::SetTrue).help("Request read-only scopes"))
-                .arg(Arg::new("full").long("full").action(clap::ArgAction::SetTrue).help("Request all scopes incl. pubsub + cloud-platform"))
-                .arg(Arg::new("scopes").long("scopes").help("Comma-separated custom scopes"))
-                .arg(Arg::new("services").long("services").short('s').help("Comma-separated service names to limit scope picker"))
+                .arg(
+                    Arg::new("readonly")
+                        .long("readonly")
+                        .action(clap::ArgAction::SetTrue)
+                        .help("Request read-only scopes"),
+                )
+                .arg(
+                    Arg::new("full")
+                        .long("full")
+                        .action(clap::ArgAction::SetTrue)
+                        .help("Request all scopes incl. pubsub + cloud-platform"),
+                )
+                .arg(
+                    Arg::new("scopes")
+                        .long("scopes")
+                        .help("Comma-separated custom scopes"),
+                )
+                .arg(
+                    Arg::new("services")
+                        .long("services")
+                        .short('s')
+                        .help("Comma-separated service names to limit scope picker"),
+                ),
         )
         .subcommand(
             Command::new("setup")
                 .about("Configure GCP project + OAuth client (requires gcloud)")
-                .arg(Arg::new("project").long("project").help("Use a specific GCP project"))
-                .arg(Arg::new("login").long("login").action(clap::ArgAction::SetTrue).help("Run 'gws auth login' after successful setup"))
+                .arg(
+                    Arg::new("project")
+                        .long("project")
+                        .help("Use a specific GCP project"),
+                )
+                .arg(
+                    Arg::new("login")
+                        .long("login")
+                        .action(clap::ArgAction::SetTrue)
+                        .help("Run 'gws auth login' after successful setup"),
+                ),
         )
         .subcommand(Command::new("status").about("Show current authentication state"))
         .subcommand(
             Command::new("export")
                 .about("Print decrypted credentials to stdout")
-                .arg(Arg::new("unmasked").long("unmasked").action(clap::ArgAction::SetTrue).help("Print raw secrets (CAUTION)"))
+                .arg(
+                    Arg::new("unmasked")
+                        .long("unmasked")
+                        .action(clap::ArgAction::SetTrue)
+                        .help("Print raw secrets (CAUTION)"),
+                ),
         )
         .subcommand(Command::new("logout").about("Clear saved credentials and token cache"));
 
-    let matches = cmd.try_get_matches_from(std::iter::once("gws auth").chain(args.iter().map(|s| s.as_str())))
+    let matches = cmd
+        .try_get_matches_from(std::iter::once("gws auth").chain(args.iter().map(|s| s.as_str())))
         .map_err(|e| GwsError::Validation(e.to_string()))?;
 
     let account = matches.get_one::<String>("account").map(|s| s.as_str());
@@ -192,8 +198,12 @@ pub async fn handle_auth_command(args: &[String]) -> Result<(), GwsError> {
     match matches.subcommand() {
         Some(("login", sub)) => {
             let mut login_args = Vec::new();
-            if sub.get_flag("readonly") { login_args.push("--readonly".to_string()); }
-            if sub.get_flag("full") { login_args.push("--full".to_string()); }
+            if sub.get_flag("readonly") {
+                login_args.push("--readonly".to_string());
+            }
+            if sub.get_flag("full") {
+                login_args.push("--full".to_string());
+            }
             if let Some(s) = sub.get_one::<String>("scopes") {
                 login_args.push("--scopes".to_string());
                 login_args.push(s.clone());
@@ -1127,13 +1137,10 @@ async fn handle_status(account: Option<&str>) -> Result<(), GwsError> {
     // If we have credentials, try to get live info (user, scopes, APIs)
     // Skip all network calls and subprocess spawning in test builds
     if !cfg!(test) {
-        let enc_path = credential_store::encrypted_credentials_path(account);
-        let default_path = config_dir().join("credentials.json");
-
-        let creds_json_str = if enc_path.exists() {
+        let creds_json_str = if has_encrypted {
             credential_store::load_encrypted(account).ok()
-        } else if default_path.exists() {
-            tokio::fs::read_to_string(&default_path).await.ok()
+        } else if has_plain {
+            tokio::fs::read_to_string(&plain_path).await.ok()
         } else {
             None
         };
@@ -1239,7 +1246,6 @@ fn handle_logout(account: Option<&str>) -> Result<(), GwsError> {
     let enc_path = credential_store::encrypted_credentials_path(account);
     let token_cache = token_cache_path(account);
     let sa_token_cache = sa_token_cache_path(account);
-
 
     let mut removed = Vec::new();
 

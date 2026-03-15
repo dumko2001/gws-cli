@@ -79,10 +79,11 @@ TIPS:
 
                 let account = matches.get_one::<String>("account");
                 let scope_strs: Vec<&str> = scopes.iter().map(|s| s.as_str()).collect();
-                let (token, auth_method) = match auth::get_token(&scope_strs, account.map(|s| s.as_str())).await {
-                    Ok(t) => (Some(t), executor::AuthMethod::OAuth),
-                    Err(_) => (None, executor::AuthMethod::None),
-                };
+                let (token, auth_method) =
+                    match auth::get_token(&scope_strs, account.map(|s| s.as_str())).await {
+                        Ok(t) => (Some(t), executor::AuthMethod::OAuth),
+                        Err(_) => (None, executor::AuthMethod::None),
+                    };
 
                 // Method: spaces.messages.create
                 let spaces_res = doc.resources.get("spaces").ok_or_else(|| {

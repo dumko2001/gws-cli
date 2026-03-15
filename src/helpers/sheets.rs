@@ -107,10 +107,11 @@ TIPS:
 
                 let scope_strs: Vec<&str> = scopes.iter().map(|s| s.as_str()).collect();
                 let account = matches.get_one::<String>("account");
-                let (token, auth_method) = match auth::get_token(&scope_strs, account.map(|s| s.as_str())).await {
-                    Ok(t) => (Some(t), executor::AuthMethod::OAuth),
-                    Err(_) => (None, executor::AuthMethod::None),
-                };
+                let (token, auth_method) =
+                    match auth::get_token(&scope_strs, account.map(|s| s.as_str())).await {
+                        Ok(t) => (Some(t), executor::AuthMethod::OAuth),
+                        Err(_) => (None, executor::AuthMethod::None),
+                    };
 
                 let spreadsheets_res = doc.resources.get("spreadsheets").ok_or_else(|| {
                     GwsError::Discovery("Resource 'spreadsheets' not found".to_string())
@@ -168,10 +169,11 @@ TIPS:
 
                 let scope_strs: Vec<&str> = scopes.iter().map(|s| s.as_str()).collect();
                 let account = matches.get_one::<String>("account");
-                let (token, auth_method) = match auth::get_token(&scope_strs, account.map(|s| s.as_str())).await {
-                    Ok(t) => (Some(t), executor::AuthMethod::OAuth),
-                    Err(_) => (None, executor::AuthMethod::None),
-                };
+                let (token, auth_method) =
+                    match auth::get_token(&scope_strs, account.map(|s| s.as_str())).await {
+                        Ok(t) => (Some(t), executor::AuthMethod::OAuth),
+                        Err(_) => (None, executor::AuthMethod::None),
+                    };
 
                 executor::execute_method(
                     doc,

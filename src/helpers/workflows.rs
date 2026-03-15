@@ -277,7 +277,13 @@ async fn handle_standup_report(matches: &ArgMatches) -> Result<(), GwsError> {
     let client = crate::client::build_client()?;
 
     // Resolve account timezone for day boundaries
-    let tz = crate::timezone::resolve_account_timezone(&client, &token, None, account.map(|s| s.as_str())).await?;
+    let tz = crate::timezone::resolve_account_timezone(
+        &client,
+        &token,
+        None,
+        account.map(|s| s.as_str()),
+    )
+    .await?;
     let now_in_tz = chrono::Utc::now().with_timezone(&tz);
     let today_start_tz = crate::timezone::start_of_today(tz)?;
     let today_end_tz = today_start_tz + chrono::Duration::days(1);
@@ -375,7 +381,13 @@ async fn handle_meeting_prep(matches: &ArgMatches) -> Result<(), GwsError> {
         .unwrap_or("primary");
 
     // Use account timezone for current time
-    let tz = crate::timezone::resolve_account_timezone(&client, &token, None, account.map(|s| s.as_str())).await?;
+    let tz = crate::timezone::resolve_account_timezone(
+        &client,
+        &token,
+        None,
+        account.map(|s| s.as_str()),
+    )
+    .await?;
     let now_rfc = chrono::Utc::now().with_timezone(&tz).to_rfc3339();
 
     let events_url = format!(
@@ -541,7 +553,13 @@ async fn handle_weekly_digest(matches: &ArgMatches) -> Result<(), GwsError> {
     let client = crate::client::build_client()?;
 
     // Resolve account timezone for week boundaries
-    let tz = crate::timezone::resolve_account_timezone(&client, &token, None, account.map(|s| s.as_str())).await?;
+    let tz = crate::timezone::resolve_account_timezone(
+        &client,
+        &token,
+        None,
+        account.map(|s| s.as_str()),
+    )
+    .await?;
     let now_in_tz = chrono::Utc::now().with_timezone(&tz);
     let week_end = now_in_tz + chrono::Duration::days(7);
     let time_min = now_in_tz.to_rfc3339();

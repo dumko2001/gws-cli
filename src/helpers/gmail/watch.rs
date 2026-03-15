@@ -395,6 +395,7 @@ fn process_pull_response(response: &Value) -> (Vec<String>, u64) {
 }
 
 /// Fetches new messages since `start_history_id` and outputs them as NDJSON.
+#[allow(clippy::too_many_arguments)]
 async fn fetch_and_output_messages(
     client: &reqwest::Client,
     gmail_token_provider: &dyn auth::AccessTokenProvider,
@@ -441,7 +442,12 @@ async fn fetch_and_output_messages(
                 // Apply sanitization if configured
                 if let Some(ref template) = sanitize_config.template {
                     let text_to_check = serde_json::to_string(&full_msg).unwrap_or_default();
-                    match crate::helpers::modelarmor::sanitize_text(template, &text_to_check, runtime.account.as_deref()).await
+                    match crate::helpers::modelarmor::sanitize_text(
+                        template,
+                        &text_to_check,
+                        runtime.account.as_deref(),
+                    )
+                    .await
                     {
                         Ok(result) => {
                             if let Some(sanitized_msg) = apply_sanitization_result(

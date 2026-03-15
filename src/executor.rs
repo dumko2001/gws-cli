@@ -232,7 +232,8 @@ async fn handle_json_response(
         // Run Model Armor sanitization if --sanitize is enabled
         if let Some(template) = sanitize_template {
             let text_to_check = serde_json::to_string(&json_val).unwrap_or_default();
-            match crate::helpers::modelarmor::sanitize_text(template, &text_to_check, account).await {
+            match crate::helpers::modelarmor::sanitize_text(template, &text_to_check, account).await
+            {
                 Ok(result) => {
                     let is_match = result.filter_match_state == "MATCH_FOUND";
                     if is_match {

@@ -43,10 +43,22 @@ fn cache_path(account: Option<&str>) -> PathBuf {
 /// Remove the cached timezone file. Called on auth login/logout to
 /// invalidate stale values when the account changes.
 pub fn invalidate_cache(account: Option<&str>) {
+    // 1. Invalidate account-specific cache
     let path = cache_path(account);
     if let Err(e) = std::fs::remove_file(&path) {
         if e.kind() != std::io::ErrorKind::NotFound {
-            tracing::warn!(path = %path.display(), error = %e, "failed to invalidate timezone cache");
+            tracing::warn!(path = %path.display(), error = %e, "failed to invalidate account-specific timezone cache");
+        }
+    }
+
+    // 2. ALSO invalidate default cache if an account was provided,
+    // because it might have been used as a fallback or be stale.
+    if account.is_some() {
+        let default_path = cache_path(None);
+        if let Err(e) = std::fs::remove_file(&default_path) {
+            if e.kind() != std::io::ErrorKind::NotFound {
+                tracing::warn!(path = %default_path.display(), error = %e, "failed to invalidate default timezone cache");
+            }
         }
     }
 }
@@ -80,7 +92,11 @@ fn write_cache(tz_name: &str, account: Option<&str>) {
 }
 
 /// Fetch the account timezone from the Google Calendar Settings API.
-async fn fetch_account_timezone(client: &reqwest::Client, token: &str, account: Option<&str>) -> Result<Tz, GwsError> {
+async fn fetch_account_timezone(
+    client: &reqwest::Client,
+    token: &str,
+    account: Option<&str>,
+) -> Result<Tz, GwsError> {
     let url = "https://www.googleapis.com/calendar/v3/users/me/settings/timezone";
     let resp = client
         .get(url)
