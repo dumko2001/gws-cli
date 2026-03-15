@@ -41,7 +41,8 @@ pub async fn handle_triage(matches: &ArgMatches) -> Result<(), GwsError> {
     // gmail.metadata scope.  When a token carries both metadata and modify
     // scopes the API may resolve to the metadata path and reject `q` with 403.
     // gmail.readonly always supports `q`.
-    let token = auth::get_token(&[GMAIL_READONLY_SCOPE])
+    let account = matches.get_one::<String>("account");
+    let token = auth::get_token(&[GMAIL_READONLY_SCOPE], account.map(|s| s.as_str()))
         .await
         .map_err(|e| GwsError::Auth(format!("Gmail auth failed: {e}")))?;
 

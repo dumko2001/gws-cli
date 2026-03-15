@@ -69,8 +69,9 @@ TIPS:
             if let Some(matches) = matches.subcommand_matches("+write") {
                 let (params_str, body_str, scopes) = build_write_request(matches, doc)?;
 
+                let account = matches.get_one::<String>("account");
                 let scope_strs: Vec<&str> = scopes.iter().map(|s| s.as_str()).collect();
-                let (token, auth_method) = match auth::get_token(&scope_strs).await {
+                let (token, auth_method) = match auth::get_token(&scope_strs, account.map(|s| s.as_str())).await {
                     Ok(t) => (Some(t), executor::AuthMethod::OAuth),
                     Err(_) => (None, executor::AuthMethod::None),
                 };
@@ -106,6 +107,7 @@ TIPS:
                     &crate::helpers::modelarmor::SanitizeMode::Warn,
                     &crate::formatter::OutputFormat::default(),
                     false,
+                    account.map(|s| s.as_str()),
                 )
                 .await?;
 

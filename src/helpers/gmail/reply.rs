@@ -23,13 +23,14 @@ pub(super) async fn handle_reply(
     let config = parse_reply_args(matches)?;
     let dry_run = matches.get_flag("dry-run");
 
+    let account = matches.get_one::<String>("account");
     let (original, token) = if dry_run {
         (
             OriginalMessage::dry_run_placeholder(&config.message_id),
             None,
         )
     } else {
-        let t = auth::get_token(&[GMAIL_SCOPE])
+        let t = auth::get_token(&[GMAIL_SCOPE], account.map(|s| s.as_str()))
             .await
             .map_err(|e| GwsError::Auth(format!("Gmail auth failed: {e}")))?;
         let client = crate::client::build_client()?;

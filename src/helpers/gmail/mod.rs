@@ -645,11 +645,13 @@ pub(super) async fn send_raw_email(
     let params = json!({ "userId": "me" });
     let params_str = params.to_string();
 
+    let account = matches.get_one::<String>("account");
     let (token, auth_method) = match existing_token {
         Some(t) => (Some(t.to_string()), executor::AuthMethod::OAuth),
         None => {
             let scopes: Vec<&str> = send_method.scopes.iter().map(|s| s.as_str()).collect();
-            match auth::get_token(&scopes).await {
+            let scope_strs: Vec<&str> = scopes.iter().copied().collect();
+            match auth::get_token(&scope_strs, account.map(|s| s.as_str())).await {
                 Ok(t) => (Some(t), executor::AuthMethod::OAuth),
                 Err(_) if matches.get_flag("dry-run") => (None, executor::AuthMethod::None),
                 Err(e) => return Err(GwsError::Auth(format!("Gmail auth failed: {e}"))),
@@ -679,6 +681,7 @@ pub(super) async fn send_raw_email(
         &crate::helpers::modelarmor::SanitizeMode::Warn,
         &crate::formatter::OutputFormat::default(),
         false,
+        account.map(|s| s.as_str()),
     )
     .await?;
 

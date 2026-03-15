@@ -226,16 +226,17 @@ TIPS:
         _sanitize_config: &'a SanitizeConfig,
     ) -> Pin<Box<dyn Future<Output = Result<bool, GwsError>> + Send + 'a>> {
         Box::pin(async move {
+            let account = matches.get_one::<String>("account");
             if let Some(sub) = matches.subcommand_matches("+sanitize-prompt") {
-                handle_sanitize(sub, "sanitizeUserPrompt", "userPromptData").await?;
+                handle_sanitize(sub, "sanitizeUserPrompt", "userPromptData", account.map(|s| s.as_str())).await?;
                 return Ok(true);
             }
             if let Some(sub) = matches.subcommand_matches("+sanitize-response") {
-                handle_sanitize(sub, "sanitizeModelResponse", "modelResponseData").await?;
+                handle_sanitize(sub, "sanitizeModelResponse", "modelResponseData", account.map(|s| s.as_str())).await?;
                 return Ok(true);
             }
             if let Some(sub) = matches.subcommand_matches("+create-template") {
-                handle_create_template(sub).await?;
+                handle_create_template(sub, account.map(|s| s.as_str())).await?;
                 return Ok(true);
             }
             Ok(false)
@@ -247,10 +248,10 @@ pub const CLOUD_PLATFORM_SCOPE: &str = "https://www.googleapis.com/auth/cloud-pl
 
 /// Sanitize text through a Model Armor template and return the result.
 /// Template format: projects/PROJECT/locations/LOCATION/templates/TEMPLATE
-pub async fn sanitize_text(template: &str, text: &str) -> Result<SanitizationResult, GwsError> {
+pub async fn sanitize_text(template: &str, text: &str, account: Option<&str>) -> Result<SanitizationResult, GwsError> {
     let (body, url) = build_sanitize_request_data(template, text, "sanitizeUserPrompt")?;
 
-    let token = auth::get_token(&[CLOUD_PLATFORM_SCOPE])
+    let token = auth::get_token(&[CLOUD_PLATFORM_SCOPE], account)
         .await
         .context("Failed to get auth token for Model Armor")?;
 
@@ -280,8 +281,8 @@ pub async fn sanitize_text(template: &str, text: &str) -> Result<SanitizationRes
 }
 
 /// Make a POST request to Model Armor's regional API endpoint.
-async fn model_armor_post(url: &str, body: &str) -> Result<(), GwsError> {
-    let token = auth::get_token(&[CLOUD_PLATFORM_SCOPE])
+async fn model_armor_post(url: &str, body: &str, account: Option<&str>) -> Result<(), GwsError> {
+    let token = auth::get_token(&[CLOUD_PLATFORM_SCOPE], account)
         .await
         .context("Failed to get auth token")?;
 
@@ -314,6 +315,7 @@ async fn handle_sanitize(
     matches: &ArgMatches,
     method_name: &str,
     data_field: &str,
+    account: Option<&str>,
 ) -> Result<(), GwsError> {
     let template_raw = matches.get_one::<String>("template").unwrap();
     let template = crate::validate::validate_resource_name(template_raw)?;
@@ -329,7 +331,7 @@ async fn handle_sanitize(
     let base = regional_base_url(location);
     let url = format!("{base}/{template}:{method_name}");
 
-    model_armor_post(&url, &body).await
+    model_armor_post(&url, &body, account).await
 }
 
 #[derive(Debug, PartialEq)]
@@ -378,7 +380,7 @@ pub fn build_create_template_url(config: &CreateTemplateConfig) -> String {
 }
 
 /// Handle +create-template
-async fn handle_create_template(matches: &ArgMatches) -> Result<(), GwsError> {
+async fn handle_create_template(matches: &ArgMatches, account: Option<&str>) -> Result<(), GwsError> {
     let config = parse_create_template_args(matches)?;
     let url = build_create_template_url(&config);
 
@@ -391,7 +393,7 @@ async fn handle_create_template(matches: &ArgMatches) -> Result<(), GwsError> {
             .unwrap_or("jailbreak")
     );
 
-    model_armor_post(&url, &config.body).await
+    model_armor_post(&url, &config.body, account).await
 }
 
 /// Loads a preset template JSON file from the templates/modelarmor/ directory.

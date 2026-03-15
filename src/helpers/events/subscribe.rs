@@ -112,10 +112,11 @@ pub(super) async fn handle_subscribe(
     }
 
     let client = crate::client::build_client()?;
-    let pubsub_token_provider = auth::token_provider(&[PUBSUB_SCOPE]);
+    let account = matches.get_one::<String>("account");
+    let pubsub_token_provider = auth::token_provider(&[PUBSUB_SCOPE], account.cloned());
 
     // Get Pub/Sub token
-    let pubsub_token = auth::get_token(&[PUBSUB_SCOPE])
+    let pubsub_token = auth::get_token(&[PUBSUB_SCOPE], account.map(|s| s.as_str()))
         .await
         .map_err(|e| GwsError::Auth(format!("Failed to get Pub/Sub token: {e}")))?;
 
@@ -187,7 +188,7 @@ pub(super) async fn handle_subscribe(
 
             // 3. Create Workspace Events subscription
             eprintln!("Creating Workspace Events subscription...");
-            let ws_token = auth::get_token(&[WORKSPACE_EVENTS_SCOPE])
+            let ws_token = auth::get_token(&[WORKSPACE_EVENTS_SCOPE], account.map(|s| s.as_str()))
                 .await
                 .map_err(|e| {
                     GwsError::Auth(format!("Failed to get Workspace Events token: {e}"))

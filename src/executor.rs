@@ -224,6 +224,7 @@ async fn handle_json_response(
     page_token: &mut Option<String>,
     capture_output: bool,
     captured: &mut Vec<Value>,
+    account: Option<&str>,
 ) -> Result<bool, GwsError> {
     if let Ok(mut json_val) = serde_json::from_str::<Value>(body_text) {
         *pages_fetched += 1;
@@ -231,7 +232,7 @@ async fn handle_json_response(
         // Run Model Armor sanitization if --sanitize is enabled
         if let Some(template) = sanitize_template {
             let text_to_check = serde_json::to_string(&json_val).unwrap_or_default();
-            match crate::helpers::modelarmor::sanitize_text(template, &text_to_check).await {
+            match crate::helpers::modelarmor::sanitize_text(template, &text_to_check, account).await {
                 Ok(result) => {
                     let is_match = result.filter_match_state == "MATCH_FOUND";
                     if is_match {
@@ -381,6 +382,7 @@ pub async fn execute_method(
     sanitize_mode: &crate::helpers::modelarmor::SanitizeMode,
     output_format: &crate::formatter::OutputFormat,
     capture_output: bool,
+    account: Option<&str>,
 ) -> Result<Option<Value>, GwsError> {
     let input = parse_and_validate_inputs(doc, method, params_json, body_json, upload_path)?;
 
@@ -477,6 +479,7 @@ pub async fn execute_method(
                 &mut page_token,
                 capture_output,
                 &mut captured_values,
+                account,
             )
             .await?;
 
@@ -2031,6 +2034,7 @@ async fn test_execute_method_dry_run() {
         &sanitize_mode,
         &crate::formatter::OutputFormat::default(),
         false,
+        None,
     )
     .await;
 
@@ -2075,6 +2079,7 @@ async fn test_execute_method_missing_path_param() {
         &sanitize_mode,
         &crate::formatter::OutputFormat::default(),
         false,
+        None,
     )
     .await;
 

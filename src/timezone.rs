@@ -30,15 +30,20 @@ const CACHE_FILENAME: &str = "account_timezone";
 /// Cache TTL in seconds (24 hours).
 const CACHE_TTL_SECS: u64 = 86400;
 
-/// Returns the path to the timezone cache file.
-fn cache_path() -> PathBuf {
-    crate::auth_commands::config_dir().join(CACHE_FILENAME)
+/// Returns the path to the timezone cache file for a specific account.
+fn cache_path(account: Option<&str>) -> PathBuf {
+    let filename = if let Some(acc) = account {
+        format!("{}.{}", CACHE_FILENAME, acc)
+    } else {
+        CACHE_FILENAME.to_string()
+    };
+    crate::auth_commands::config_dir().join(filename)
 }
 
 /// Remove the cached timezone file. Called on auth login/logout to
 /// invalidate stale values when the account changes.
-pub fn invalidate_cache() {
-    let path = cache_path();
+pub fn invalidate_cache(account: Option<&str>) {
+    let path = cache_path(account);
     if let Err(e) = std::fs::remove_file(&path) {
         if e.kind() != std::io::ErrorKind::NotFound {
             tracing::warn!(path = %path.display(), error = %e, "failed to invalidate timezone cache");
@@ -47,8 +52,8 @@ pub fn invalidate_cache() {
 }
 
 /// Read the cached timezone if it exists and is fresh (< 24h old).
-fn read_cache() -> Option<Tz> {
-    let path = cache_path();
+fn read_cache(account: Option<&str>) -> Option<Tz> {
+    let path = cache_path(account);
     let metadata = std::fs::metadata(&path).ok()?;
     let modified = metadata.modified().ok()?;
     let age = std::time::SystemTime::now().duration_since(modified).ok()?;
@@ -61,8 +66,8 @@ fn read_cache() -> Option<Tz> {
 }
 
 /// Write a timezone name to the cache file.
-fn write_cache(tz_name: &str) {
-    let path = cache_path();
+fn write_cache(tz_name: &str, account: Option<&str>) {
+    let path = cache_path(account);
     if let Some(parent) = path.parent() {
         if let Err(e) = std::fs::create_dir_all(parent) {
             tracing::warn!(path = %parent.display(), error = %e, "failed to create timezone cache directory");
@@ -75,7 +80,7 @@ fn write_cache(tz_name: &str) {
 }
 
 /// Fetch the account timezone from the Google Calendar Settings API.
-async fn fetch_account_timezone(client: &reqwest::Client, token: &str) -> Result<Tz, GwsError> {
+async fn fetch_account_timezone(client: &reqwest::Client, token: &str, account: Option<&str>) -> Result<Tz, GwsError> {
     let url = "https://www.googleapis.com/calendar/v3/users/me/settings/timezone";
     let resp = client
         .get(url)
@@ -117,7 +122,7 @@ async fn fetch_account_timezone(client: &reqwest::Client, token: &str) -> Result
     })?;
 
     // Cache for future use
-    write_cache(tz_name);
+    write_cache(tz_name, account);
     tracing::info!(
         timezone = tz_name,
         source = "calendar_api",
@@ -145,6 +150,7 @@ pub async fn resolve_account_timezone(
     client: &reqwest::Client,
     token: &str,
     tz_override: Option<&str>,
+    account: Option<&str>,
 ) -> Result<Tz, GwsError> {
     // 1. Explicit override — fail if invalid
     if let Some(tz_str) = tz_override {
@@ -158,13 +164,13 @@ pub async fn resolve_account_timezone(
     }
 
     // 2. Check cache
-    if let Some(tz) = read_cache() {
+    if let Some(tz) = read_cache(account) {
         tracing::debug!(timezone = %tz, source = "cache", "using cached timezone");
         return Ok(tz);
     }
 
     // 3. Fetch from Calendar Settings API
-    match fetch_account_timezone(client, token).await {
+    match fetch_account_timezone(client, token, account).await {
         Ok(tz) => return Ok(tz),
         Err(e) => {
             tracing::warn!(error = %e, "failed to fetch account timezone, falling back to local");

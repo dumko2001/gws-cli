@@ -157,8 +157,9 @@ TIPS:
             if let Some(matches) = matches.subcommand_matches("+insert") {
                 let (params_str, body_str, scopes) = build_insert_request(matches, doc)?;
 
+                let account = matches.get_one::<String>("account");
                 let scopes_str: Vec<&str> = scopes.iter().map(|s| s.as_str()).collect();
-                let (token, auth_method) = match auth::get_token(&scopes_str).await {
+                let (token, auth_method) = match auth::get_token(&scopes_str, account.map(|s| s.as_str())).await {
                     Ok(t) => (Some(t), executor::AuthMethod::OAuth),
                     Err(_) => (None, executor::AuthMethod::None),
                 };
@@ -186,6 +187,7 @@ TIPS:
                     &crate::helpers::modelarmor::SanitizeMode::Warn,
                     &crate::formatter::OutputFormat::default(),
                     false,
+                    account.map(|s| s.as_str()),
                 )
                 .await?;
 
@@ -201,7 +203,8 @@ TIPS:
 }
 async fn handle_agenda(matches: &ArgMatches) -> Result<(), GwsError> {
     let cal_scope = "https://www.googleapis.com/auth/calendar.readonly";
-    let token = auth::get_token(&[cal_scope])
+    let account = matches.get_one::<String>("account");
+    let token = auth::get_token(&[cal_scope], account.map(|s| s.as_str()))
         .await
         .map_err(|e| GwsError::Auth(format!("Calendar auth failed: {e}")))?;
 
@@ -212,7 +215,7 @@ async fn handle_agenda(matches: &ArgMatches) -> Result<(), GwsError> {
 
     let client = crate::client::build_client()?;
     let tz_override = matches.get_one::<String>("timezone").map(|s| s.as_str());
-    let tz = crate::timezone::resolve_account_timezone(&client, &token, tz_override).await?;
+    let tz = crate::timezone::resolve_account_timezone(&client, &token, tz_override, account.map(|s| s.as_str())).await?;
 
     // Determine time range using the account timezone so that --today and
     // --tomorrow align with the user's Google account day, not the machine.

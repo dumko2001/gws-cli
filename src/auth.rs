@@ -93,12 +93,14 @@ pub trait AccessTokenProvider: Send + Sync {
 #[derive(Debug, Clone)]
 pub struct ScopedTokenProvider {
     scopes: Vec<String>,
+    account: Option<String>,
 }
 
 impl ScopedTokenProvider {
-    pub fn new(scopes: &[&str]) -> Self {
+    pub fn new(scopes: &[&str], account: Option<String>) -> Self {
         Self {
             scopes: scopes.iter().map(|scope| (*scope).to_string()).collect(),
+            account,
         }
     }
 }
@@ -107,12 +109,12 @@ impl ScopedTokenProvider {
 impl AccessTokenProvider for ScopedTokenProvider {
     async fn access_token(&self) -> anyhow::Result<String> {
         let scopes: Vec<&str> = self.scopes.iter().map(String::as_str).collect();
-        get_token(&scopes).await
+        get_token(&scopes, self.account.as_deref()).await
     }
 }
 
-pub fn token_provider(scopes: &[&str]) -> ScopedTokenProvider {
-    ScopedTokenProvider::new(scopes)
+pub fn token_provider(scopes: &[&str], account: Option<String>) -> ScopedTokenProvider {
+    ScopedTokenProvider::new(scopes, account)
 }
 
 /// A fake [`AccessTokenProvider`] for tests that returns tokens from a queue.
@@ -155,7 +157,7 @@ impl AccessTokenProvider for FakeTokenProvider {
 ///    - `GOOGLE_APPLICATION_CREDENTIALS` env var (path to a JSON credentials file), then
 ///    - Well-known ADC path: `~/.config/gcloud/application_default_credentials.json`
 ///      (populated by `gcloud auth application-default login`)
-pub async fn get_token(scopes: &[&str]) -> anyhow::Result<String> {
+pub async fn get_token(scopes: &[&str], account: Option<&str>) -> anyhow::Result<String> {
     // 0. Direct token from env var (highest priority, bypasses all credential loading)
     if let Ok(token) = std::env::var("GOOGLE_WORKSPACE_CLI_TOKEN") {
         if !token.is_empty() {
@@ -165,11 +167,15 @@ pub async fn get_token(scopes: &[&str]) -> anyhow::Result<String> {
 
     let creds_file = std::env::var("GOOGLE_WORKSPACE_CLI_CREDENTIALS_FILE").ok();
     let config_dir = crate::auth_commands::config_dir();
-    let enc_path = credential_store::encrypted_credentials_path();
-    let default_path = config_dir.join("credentials.json");
-    let token_cache = config_dir.join("token_cache.json");
 
-    let creds = load_credentials_inner(creds_file.as_deref(), &enc_path, &default_path).await?;
+    let tc_filename = if let Some(acc) = account {
+        format!("token_cache.{acc}.json")
+    } else {
+        "token_cache.json".to_string()
+    };
+    let token_cache = config_dir.join(tc_filename);
+
+    let creds = load_credentials_inner(creds_file.as_deref(), account).await?;
     get_token_inner(scopes, creds, &token_cache).await
 }
 
@@ -255,9 +261,11 @@ async fn parse_credential_file(
 
 async fn load_credentials_inner(
     env_file: Option<&str>,
-    enc_path: &std::path::Path,
-    default_path: &std::path::Path,
+    account: Option<&str>,
 ) -> anyhow::Result<Credential> {
+    let config_dir = crate::auth_commands::config_dir();
+    let enc_path = credential_store::encrypted_credentials_path(account);
+    let default_path = config_dir.join("credentials.json");
     // 1. Explicit env var — plaintext file (User or Service Account)
     if let Some(path) = env_file {
         let p = PathBuf::from(path);
@@ -274,9 +282,9 @@ async fn load_credentials_inner(
 
     // 2. Encrypted credentials
     if enc_path.exists() {
-        match credential_store::load_encrypted_from_path(enc_path) {
+        match credential_store::load_encrypted_from_path(&enc_path) {
             Ok(json_str) => {
-                return parse_credential_file(enc_path, &json_str).await;
+                return parse_credential_file(&enc_path, &json_str).await;
             }
             Err(e) => {
                 // Decryption failed — the encryption key likely changed (e.g. after
@@ -287,7 +295,7 @@ async fn load_credentials_inner(
                     "Warning: removing undecryptable credentials file ({}): {e:#}",
                     enc_path.display()
                 );
-                if let Err(err) = tokio::fs::remove_file(enc_path).await {
+                if let Err(err) = tokio::fs::remove_file(&enc_path).await {
                     eprintln!(
                         "Warning: failed to remove stale credentials file '{}': {err}",
                         enc_path.display()
@@ -313,7 +321,7 @@ async fn load_credentials_inner(
     // 3. Plaintext credentials at default path (AuthorizedUser)
     if default_path.exists() {
         return Ok(Credential::AuthorizedUser(
-            yup_oauth2::read_authorized_user_secret(default_path)
+            yup_oauth2::read_authorized_user_secret(default_path.clone())
                 .await
                 .with_context(|| {
                     format!("Failed to read credentials from {}", default_path.display())
@@ -401,18 +409,13 @@ mod tests {
     #[tokio::test]
     #[serial_test::serial]
     async fn test_load_credentials_no_options() {
-        // Isolate from host ADC: override HOME so adc_well_known_path()
-        // resolves to a non-existent directory, and clear the env var.
+        // Isolate from host ADC: override CONFIG_DIR and clear ADC env var.
         let tmp = tempfile::tempdir().unwrap();
-        let _home_guard = EnvVarGuard::set("HOME", tmp.path());
+        let _config_guard = EnvVarGuard::set("GOOGLE_WORKSPACE_CLI_CONFIG_DIR", tmp.path());
         let _adc_guard = EnvVarGuard::remove("GOOGLE_APPLICATION_CREDENTIALS");
+        let _home_guard = EnvVarGuard::set("HOME", "/missing/home");
 
-        let err = load_credentials_inner(
-            None,
-            &PathBuf::from("/does/not/exist1"),
-            &PathBuf::from("/does/not/exist2"),
-        )
-        .await;
+        let err = load_credentials_inner(None, None).await;
 
         assert!(err.is_err());
         assert!(err
@@ -433,17 +436,15 @@ mod tests {
         }"#;
         file.write_all(json.as_bytes()).unwrap();
 
+        let tmp = tempfile::tempdir().unwrap();
+        let _config_guard = EnvVarGuard::set("GOOGLE_WORKSPACE_CLI_CONFIG_DIR", tmp.path());
+        let _home_guard = EnvVarGuard::set("HOME", tmp.path());
         let _adc_guard = EnvVarGuard::set(
             "GOOGLE_APPLICATION_CREDENTIALS",
             file.path().to_str().unwrap(),
         );
 
-        let res = load_credentials_inner(
-            None,
-            &PathBuf::from("/missing/enc"),
-            &PathBuf::from("/missing/plain"),
-        )
-        .await;
+        let res = load_credentials_inner(None, None).await;
 
         match res.unwrap() {
             Credential::AuthorizedUser(secret) => {
@@ -475,12 +476,7 @@ mod tests {
             file.path().to_str().unwrap(),
         );
 
-        let res = load_credentials_inner(
-            None,
-            &PathBuf::from("/missing/enc"),
-            &PathBuf::from("/missing/plain"),
-        )
-        .await;
+        let res = load_credentials_inner(None, None).await;
 
         match res.unwrap() {
             Credential::ServiceAccount(key) => {
@@ -500,12 +496,7 @@ mod tests {
 
         // When GOOGLE_APPLICATION_CREDENTIALS points to a missing file, we error immediately
         // rather than falling through — the user explicitly asked for this file.
-        let err = load_credentials_inner(
-            None,
-            &PathBuf::from("/missing/enc"),
-            &PathBuf::from("/missing/plain"),
-        )
-        .await;
+        let err = load_credentials_inner(None, None).await;
 
         assert!(err.is_err());
         let msg = err.unwrap_err().to_string();
@@ -517,12 +508,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_load_credentials_env_file_missing() {
-        let err = load_credentials_inner(
-            Some("/does/not/exist"),
-            &PathBuf::from("/also/missing"),
-            &PathBuf::from("/still/missing"),
-        )
-        .await;
+        let err = load_credentials_inner(Some("/does/not/exist"), None).await;
         assert!(err.is_err());
         assert!(err.unwrap_err().to_string().contains("does not exist"));
     }
@@ -538,13 +524,9 @@ mod tests {
         }"#;
         file.write_all(json.as_bytes()).unwrap();
 
-        let res = load_credentials_inner(
-            Some(file.path().to_str().unwrap()),
-            &PathBuf::from("/also/missing"),
-            &PathBuf::from("/still/missing"),
-        )
-        .await
-        .unwrap();
+        let res = load_credentials_inner(Some(file.path().to_str().unwrap()), None)
+            .await
+            .unwrap();
 
         match res {
             Credential::AuthorizedUser(secret) => {
@@ -570,13 +552,9 @@ mod tests {
         }"#;
         file.write_all(json.as_bytes()).unwrap();
 
-        let res = load_credentials_inner(
-            Some(file.path().to_str().unwrap()),
-            &PathBuf::from("/also/missing"),
-            &PathBuf::from("/still/missing"),
-        )
-        .await
-        .unwrap();
+        let res = load_credentials_inner(Some(file.path().to_str().unwrap()), None)
+            .await
+            .unwrap();
 
         match res {
             Credential::ServiceAccount(key) => {
@@ -588,18 +566,18 @@ mod tests {
 
     #[tokio::test]
     async fn test_load_credentials_default_path_authorized_user() {
-        let mut file = NamedTempFile::new().unwrap();
+        let dir = tempfile::tempdir().unwrap();
         let json = r#"{
             "client_id": "default_id",
             "client_secret": "default_secret",
             "refresh_token": "default_refresh",
             "type": "authorized_user"
         }"#;
-        file.write_all(json.as_bytes()).unwrap();
+        let plain_path = dir.path().join("credentials.json");
+        std::fs::write(&plain_path, json).unwrap();
 
-        let res = load_credentials_inner(None, &PathBuf::from("/also/missing"), file.path())
-            .await
-            .unwrap();
+        let _config_guard = EnvVarGuard::set("GOOGLE_WORKSPACE_CLI_CONFIG_DIR", dir.path());
+        let res = load_credentials_inner(None, None).await.unwrap();
 
         match res {
             Credential::AuthorizedUser(secret) => {
@@ -614,7 +592,7 @@ mod tests {
     async fn test_get_token_from_env_var() {
         let _token_guard = EnvVarGuard::set("GOOGLE_WORKSPACE_CLI_TOKEN", "my-test-token");
 
-        let result = get_token(&["https://www.googleapis.com/auth/drive"]).await;
+        let result = get_token(&["https://www.googleapis.com/auth/drive"], None).await;
 
         assert!(result.is_ok());
         assert_eq!(result.unwrap(), "my-test-token");
@@ -624,7 +602,7 @@ mod tests {
     #[serial_test::serial]
     async fn test_scoped_token_provider_uses_get_token() {
         let _token_guard = EnvVarGuard::set("GOOGLE_WORKSPACE_CLI_TOKEN", "provider-token");
-        let provider = token_provider(&["https://www.googleapis.com/auth/drive"]);
+        let provider = token_provider(&["https://www.googleapis.com/auth/drive"], None);
 
         let first = provider.access_token().await.unwrap();
         let second = provider.access_token().await.unwrap();
@@ -650,9 +628,8 @@ mod tests {
         let encrypted = crate::credential_store::encrypt(json.as_bytes()).unwrap();
         std::fs::write(&enc_path, &encrypted).unwrap();
 
-        let res = load_credentials_inner(None, &enc_path, &PathBuf::from("/does/not/exist"))
-            .await
-            .unwrap();
+        let _config_guard = EnvVarGuard::set("GOOGLE_WORKSPACE_CLI_CONFIG_DIR", dir.path());
+        let res = load_credentials_inner(None, None).await.unwrap();
 
         match res {
             Credential::AuthorizedUser(secret) => {
@@ -688,9 +665,8 @@ mod tests {
         std::fs::write(&enc_path, &encrypted).unwrap();
         std::fs::write(&plain_path, plain_json).unwrap();
 
-        let res = load_credentials_inner(None, &enc_path, &plain_path)
-            .await
-            .unwrap();
+        let _config_guard = EnvVarGuard::set("GOOGLE_WORKSPACE_CLI_CONFIG_DIR", dir.path());
+        let res = load_credentials_inner(None, None).await.unwrap();
 
         match res {
             Credential::AuthorizedUser(secret) => {
@@ -708,10 +684,6 @@ mod tests {
     async fn test_load_credentials_corrupt_encrypted_file_is_removed() {
         // When credentials.enc cannot be decrypted, the file should be removed
         // automatically and the function should fall through to other sources.
-        let tmp = tempfile::tempdir().unwrap();
-        let _home_guard = EnvVarGuard::set("HOME", tmp.path());
-        let _adc_guard = EnvVarGuard::remove("GOOGLE_APPLICATION_CREDENTIALS");
-
         let dir = tempfile::tempdir().unwrap();
         let enc_path = dir.path().join("credentials.enc");
 
@@ -721,12 +693,15 @@ mod tests {
             .unwrap();
         assert!(enc_path.exists());
 
-        let result =
-            load_credentials_inner(None, &enc_path, &PathBuf::from("/does/not/exist")).await;
+        let _config_guard = EnvVarGuard::set("GOOGLE_WORKSPACE_CLI_CONFIG_DIR", dir.path());
+        let _adc_guard = EnvVarGuard::remove("GOOGLE_APPLICATION_CREDENTIALS");
+        let _home_guard = EnvVarGuard::set("HOME", "/missing/home");
+
+        let res = load_credentials_inner(None, None).await;
 
         // Should fall through to "No credentials found" (not a decryption error).
-        assert!(result.is_err());
-        let msg = result.unwrap_err().to_string();
+        assert!(res.is_err());
+        let msg = res.unwrap_err().to_string();
         assert!(
             msg.contains("No credentials found"),
             "Should fall through to final error, got: {msg}"
@@ -760,9 +735,8 @@ mod tests {
         }"#;
         tokio::fs::write(&plain_path, plain_json).await.unwrap();
 
-        let res = load_credentials_inner(None, &enc_path, &plain_path)
-            .await
-            .unwrap();
+        let _config_guard = EnvVarGuard::set("GOOGLE_WORKSPACE_CLI_CONFIG_DIR", dir.path());
+        let res = load_credentials_inner(None, None).await.unwrap();
 
         match res {
             Credential::AuthorizedUser(secret) => {
@@ -781,18 +755,13 @@ mod tests {
     async fn test_get_token_env_var_empty_falls_through() {
         // An empty token should not short-circuit — it should be ignored
         // and fall through to normal credential loading.
-        // Isolate from host ADC so the well-known path doesn't match.
         let tmp = tempfile::tempdir().unwrap();
-        let _home_guard = EnvVarGuard::set("HOME", tmp.path());
+        let _config_guard = EnvVarGuard::set("GOOGLE_WORKSPACE_CLI_CONFIG_DIR", tmp.path());
         let _adc_guard = EnvVarGuard::remove("GOOGLE_APPLICATION_CREDENTIALS");
+        let _home_guard = EnvVarGuard::set("HOME", "/missing/home");
         let _token_guard = EnvVarGuard::set("GOOGLE_WORKSPACE_CLI_TOKEN", "");
 
-        let result = load_credentials_inner(
-            None,
-            &PathBuf::from("/does/not/exist1"),
-            &PathBuf::from("/does/not/exist2"),
-        )
-        .await;
+        let result = load_credentials_inner(None, None).await;
 
         // Should fall through to normal credential loading, which fails
         // because we pointed at non-existent paths
@@ -836,18 +805,18 @@ mod tests {
     #[serial_test::serial]
     fn test_get_quota_project_priority_adc_fallback() {
         let tmp = tempfile::tempdir().unwrap();
-        let adc_dir = tmp.path().join(".config").join("gcloud");
-        std::fs::create_dir_all(&adc_dir).unwrap();
+        let gcloud_dir = tmp.path().join(".config").join("gcloud");
+        std::fs::create_dir_all(&gcloud_dir).unwrap();
         std::fs::write(
-            adc_dir.join("application_default_credentials.json"),
+            gcloud_dir.join("application_default_credentials.json"),
             r#"{"quota_project_id": "adc-project"}"#,
         )
         .unwrap();
 
         let _home_guard = EnvVarGuard::set("HOME", tmp.path());
+        let _adc_guard = EnvVarGuard::remove("GOOGLE_APPLICATION_CREDENTIALS");
         let _env_guard = EnvVarGuard::remove("GOOGLE_WORKSPACE_PROJECT_ID");
         let _config_guard = EnvVarGuard::remove("GOOGLE_WORKSPACE_CLI_CONFIG_DIR");
-        let _adc_guard = EnvVarGuard::remove("GOOGLE_APPLICATION_CREDENTIALS");
 
         assert_eq!(get_quota_project(), Some("adc-project".to_string()));
     }
@@ -856,17 +825,16 @@ mod tests {
     #[serial_test::serial]
     fn test_get_quota_project_reads_adc() {
         let tmp = tempfile::tempdir().unwrap();
-        let adc_dir = tmp.path().join(".config").join("gcloud");
-        std::fs::create_dir_all(&adc_dir).unwrap();
+        let gcloud_dir = tmp.path().join(".config").join("gcloud");
+        std::fs::create_dir_all(&gcloud_dir).unwrap();
         std::fs::write(
-            adc_dir.join("application_default_credentials.json"),
+            gcloud_dir.join("application_default_credentials.json"),
             r#"{"quota_project_id": "my-project-123"}"#,
         )
         .unwrap();
 
         let _home_guard = EnvVarGuard::set("HOME", tmp.path());
         let _adc_guard = EnvVarGuard::remove("GOOGLE_APPLICATION_CREDENTIALS");
-        // Isolate from local environment
         let _env_guard = EnvVarGuard::remove("GOOGLE_WORKSPACE_PROJECT_ID");
         let _config_guard = EnvVarGuard::remove("GOOGLE_WORKSPACE_CLI_CONFIG_DIR");
 

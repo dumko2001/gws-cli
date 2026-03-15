@@ -371,13 +371,18 @@ pub fn active_backend_name() -> &'static str {
 }
 
 /// Returns the path for encrypted credentials.
-pub fn encrypted_credentials_path() -> PathBuf {
-    crate::auth_commands::config_dir().join("credentials.enc")
+pub fn encrypted_credentials_path(account: Option<&str>) -> PathBuf {
+    let filename = if let Some(acc) = account {
+        format!("credentials.{acc}.enc")
+    } else {
+        "credentials.enc".to_string()
+    };
+    crate::auth_commands::config_dir().join(filename)
 }
 
 /// Saves credentials JSON to an encrypted file.
-pub fn save_encrypted(json: &str) -> anyhow::Result<PathBuf> {
-    let path = encrypted_credentials_path();
+pub fn save_encrypted(json: &str, account: Option<&str>) -> anyhow::Result<PathBuf> {
+    let path = encrypted_credentials_path(account);
     if let Some(parent) = path.parent() {
         std::fs::create_dir_all(parent)?;
         #[cfg(unix)]
@@ -423,8 +428,8 @@ pub fn load_encrypted_from_path(path: &std::path::Path) -> anyhow::Result<String
 }
 
 /// Loads and decrypts credentials JSON from the default encrypted file.
-pub fn load_encrypted() -> anyhow::Result<String> {
-    load_encrypted_from_path(&encrypted_credentials_path())
+pub fn load_encrypted(account: Option<&str>) -> anyhow::Result<String> {
+    load_encrypted_from_path(&encrypted_credentials_path(account))
 }
 
 #[cfg(test)]

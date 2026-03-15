@@ -46,6 +46,14 @@ pub fn build_cli(doc: &RestDescription) -> Command {
                 .help("Output format: json (default), table, yaml, csv")
                 .value_name("FORMAT")
                 .global(true),
+        )
+        .arg(
+            clap::Arg::new("account")
+                .long("account")
+                .short('A')
+                .help("Google account name/alias to use for authentication (e.g. 'work', 'personal')")
+                .value_name("NAME")
+                .global(true),
         );
 
     // Inject helper commands

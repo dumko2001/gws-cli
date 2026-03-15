@@ -16,16 +16,17 @@ pub(super) async fn handle_watch(
     }
 
     let client = crate::client::build_client()?;
-    let gmail_token_provider = auth::token_provider(&[GMAIL_SCOPE]);
-    let pubsub_token_provider = auth::token_provider(&[PUBSUB_SCOPE]);
+    let account = matches.get_one::<String>("account");
+    let gmail_token_provider = auth::token_provider(&[GMAIL_SCOPE], account.cloned());
+    let pubsub_token_provider = auth::token_provider(&[PUBSUB_SCOPE], account.cloned());
 
     // Get tokens
-    let gmail_token = auth::get_token(&[GMAIL_SCOPE])
+    let gmail_token = auth::get_token(&[GMAIL_SCOPE], account.map(|s| s.as_str()))
         .await
-        .context("Failed to get Gmail token")?;
-    let pubsub_token = auth::get_token(&[PUBSUB_SCOPE])
+        .map_err(|e| GwsError::Auth(format!("Gmail auth failed: {e}")))?;
+    let pubsub_token = auth::get_token(&[PUBSUB_SCOPE], account.map(|s| s.as_str()))
         .await
-        .context("Failed to get Pub/Sub token")?;
+        .map_err(|e| GwsError::Auth(format!("Pub/Sub auth failed: {e}")))?;
 
     let (pubsub_subscription, topic_name, created_resources) = if let Some(ref sub_name) =
         config.subscription
@@ -208,6 +209,7 @@ pub(super) async fn handle_watch(
         sanitize_config,
         pubsub_api_base: PUBSUB_API_BASE,
         gmail_api_base: GMAIL_API_BASE,
+        account: account.cloned(),
     };
     let result = watch_pull_loop(
         &runtime,
@@ -305,7 +307,6 @@ async fn watch_pull_loop(
         let pull_response: Value = resp.json().await.context("Failed to parse pull response")?;
 
         let (ack_ids, max_history_id) = process_pull_response(&pull_response);
-
         if max_history_id > *last_history_id && *last_history_id > 0 {
             // Fetch new messages via history API
             fetch_and_output_messages(
@@ -316,6 +317,7 @@ async fn watch_pull_loop(
                 config.output_dir.as_ref(),
                 runtime.sanitize_config,
                 runtime.gmail_api_base,
+                runtime,
             )
             .await?;
         }
@@ -401,6 +403,7 @@ async fn fetch_and_output_messages(
     output_dir: Option<&std::path::PathBuf>,
     sanitize_config: &crate::helpers::modelarmor::SanitizeConfig,
     gmail_api_base: &str,
+    runtime: &WatchRuntime<'_>,
 ) -> Result<(), GwsError> {
     let gmail_token = gmail_token_provider
         .access_token()
@@ -438,7 +441,7 @@ async fn fetch_and_output_messages(
                 // Apply sanitization if configured
                 if let Some(ref template) = sanitize_config.template {
                     let text_to_check = serde_json::to_string(&full_msg).unwrap_or_default();
-                    match crate::helpers::modelarmor::sanitize_text(template, &text_to_check).await
+                    match crate::helpers::modelarmor::sanitize_text(template, &text_to_check, runtime.account.as_deref()).await
                     {
                         Ok(result) => {
                             if let Some(sanitized_msg) = apply_sanitization_result(
@@ -554,6 +557,7 @@ struct WatchRuntime<'a> {
     sanitize_config: &'a crate::helpers::modelarmor::SanitizeConfig,
     pubsub_api_base: &'a str,
     gmail_api_base: &'a str,
+    account: Option<String>,
 }
 
 fn parse_watch_args(matches: &ArgMatches) -> Result<WatchConfig, GwsError> {
@@ -942,6 +946,7 @@ mod tests {
             sanitize_config: &sanitize_config,
             pubsub_api_base: &pubsub_base,
             gmail_api_base: &gmail_base,
+            account: None,
         };
 
         watch_pull_loop(

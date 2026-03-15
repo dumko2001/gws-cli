@@ -237,8 +237,10 @@ async fn run() -> Result<(), GwsError> {
     // to avoid restrictive scopes like gmail.metadata that block query parameters.
     let scopes: Vec<&str> = select_scope(&method.scopes).into_iter().collect();
 
+    let account = matches.get_one::<String>("account");
+
     // Authenticate: try OAuth, fail with error if credentials exist but are broken
-    let (token, auth_method) = match auth::get_token(&scopes).await {
+    let (token, auth_method) = match auth::get_token(&scopes, account.map(|s| s.as_str())).await {
         Ok(t) => (Some(t), executor::AuthMethod::OAuth),
         Err(e) => {
             // If credentials were found but failed (e.g. decryption error, invalid token),
@@ -271,9 +273,10 @@ async fn run() -> Result<(), GwsError> {
         &sanitize_config.mode,
         &output_format,
         false,
+        account.map(|s| s.as_str()),
     )
-    .await
-    .map(|_| ())
+    .await?;
+    Ok(())
 }
 
 /// Select the best scope from a method's scope list.
