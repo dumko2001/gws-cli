@@ -207,7 +207,17 @@ impl yup_oauth2::authenticator_delegate::InstalledFlowDelegate for CliFlowDelega
 
             // Inject prompt=consent if requested (for readonly enforcement)
             if self.force_consent {
-                if display_url.contains('?') {
+                if let Some(pos) = display_url.find("prompt=") {
+                    let end_pos = display_url[pos..]
+                        .find('&')
+                        .map(|i| pos + i)
+                        .unwrap_or(display_url.len());
+                    let current_prompt = &display_url[pos + 7..end_pos];
+                    if !current_prompt.contains("consent") {
+                        let new_prompt = format!("{}%20consent", current_prompt);
+                        display_url.replace_range(pos + 7..end_pos, &new_prompt);
+                    }
+                } else if display_url.contains('?') {
                     display_url.push_str("&prompt=consent");
                 } else {
                     display_url.push_str("?prompt=consent");

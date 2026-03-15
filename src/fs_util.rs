@@ -74,7 +74,6 @@ pub async fn atomic_write_async(path: &Path, data: &[u8]) -> io::Result<()> {
 
     #[cfg(unix)]
     {
-        use std::os::unix::fs::OpenOptionsExt;
         options.mode(0o600);
     }
 
