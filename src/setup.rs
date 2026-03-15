@@ -1442,8 +1442,13 @@ async fn stage_configure_oauth(ctx: &mut SetupContext) -> Result<SetupStage, Gws
     }
 
     let (cid_result, csecret_result) = if let Some(ref mut w) = ctx.wizard {
+        let account_param = if ctx.account.is_empty() {
+            None
+        } else {
+            Some(ctx.account.as_str())
+        };
         let current_creds: Option<serde_json::Value> =
-            crate::credential_store::load_encrypted(None)
+            crate::credential_store::load_encrypted(account_param)
                 .ok()
                 .and_then(|s| serde_json::from_str(&s).ok());
 

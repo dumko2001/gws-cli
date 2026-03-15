@@ -312,7 +312,7 @@ async fn load_credentials_inner(
     // 3. Plaintext credentials at default path (AuthorizedUser)
     if default_path.exists() {
         return Ok(Credential::AuthorizedUser(
-            yup_oauth2::read_authorized_user_secret(default_path.clone())
+            yup_oauth2::read_authorized_user_secret(&default_path)
                 .await
                 .with_context(|| {
                     format!("Failed to read credentials from {}", default_path.display())
