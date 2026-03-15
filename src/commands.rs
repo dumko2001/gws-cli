@@ -53,7 +53,32 @@ pub fn build_cli(doc: &RestDescription) -> Command {
                 .short('A')
                 .help("Google account name/alias to use for authentication (e.g. 'work', 'personal')")
                 .value_name("NAME")
-                .global(true),
+                .global(true)
+                .value_parser(|name: &str| -> Result<String, String> {
+                    const MAX_LEN: usize = 63;
+                    if name.is_empty() {
+                        return Err("Account name cannot be empty.".to_string());
+                    }
+                    if name.len() > MAX_LEN {
+                        return Err(format!(
+                            "Account name cannot be longer than {} characters.",
+                            MAX_LEN
+                        ));
+                    }
+                    if !name
+                        .chars()
+                        .all(|c| c.is_alphanumeric() || c == '-' || c == '_')
+                    {
+                        return Err(
+                            "Account name must only contain alphanumeric characters, dashes, and underscores."
+                                .to_string(),
+                        );
+                    }
+                    if name == "." || name == ".." {
+                        return Err("Account name cannot be '.' or '..'.".to_string());
+                    }
+                    Ok(name.to_string())
+                }),
         );
 
     // Inject helper commands
