@@ -94,7 +94,7 @@ EXAMPLES:
 
 TIPS:
   Use RFC3339 format for times (e.g. 2026-06-17T09:00:00-07:00).
-  Google Meet generation requires the 'conferenceDataVersion=1' API flag."),
+  The --meet flag automatically adds a Google Meet link to the event."),
         );
         cmd = cmd.subcommand(
             Command::new("+agenda")
