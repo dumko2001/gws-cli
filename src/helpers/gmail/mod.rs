@@ -1041,13 +1041,6 @@ TIPS:
                         .action(ArgAction::SetTrue),
                 )
                 .arg(
-                    Arg::new("body-only")
-                        .long("body-only")
-                        .help("Only output the message body (default behavior)")
-                        .action(ArgAction::SetTrue)
-                        .conflicts_with("headers"),
-                )
-                .arg(
                     Arg::new("dry-run")
                         .long("dry-run")
                         .help("Show the request that would be sent without executing it")

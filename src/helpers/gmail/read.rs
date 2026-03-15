@@ -61,7 +61,11 @@ pub(super) async fn handle_read(
     }
 
     let body = if use_html {
-        original.body_html.as_deref().unwrap_or(&original.body_text)
+        original
+            .body_html
+            .as_deref()
+            .filter(|s| !s.is_empty())
+            .unwrap_or(&original.body_text)
     } else {
         &original.body_text
     };
