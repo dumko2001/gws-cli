@@ -8,12 +8,12 @@ metadata:
     domain: "scheduling"
     requires:
       bins: ["gws"]
-      skills: ["gws-calendar"]
+      skills: ["references/gws-calendar"]
 ---
 
 # Block Focus Time on Google Calendar
 
-> **PREREQUISITE:** Load the following skills to execute this recipe: `gws-calendar`
+> **PREREQUISITE:** Load the following skills to execute this recipe: `references/gws-calendar`
 
 Create recurring focus time blocks on Google Calendar to protect deep work hours.
 

@@ -8,12 +8,12 @@ metadata:
     domain: "productivity"
     requires:
       bins: ["gws"]
-      skills: ["gws-sheets"]
+      skills: ["references/gws-sheets"]
 ---
 
 # Copy a Google Sheet for a New Month
 
-> **PREREQUISITE:** Load the following skills to execute this recipe: `gws-sheets`
+> **PREREQUISITE:** Load the following skills to execute this recipe: `references/gws-sheets`
 
 Duplicate a Google Sheets template tab for a new month of tracking.
 

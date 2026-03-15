@@ -8,12 +8,12 @@ metadata:
     domain: "productivity"
     requires:
       bins: ["gws"]
-      skills: ["gws-drive"]
+      skills: ["references/gws-drive"]
 ---
 
 # Bulk Download Drive Folder
 
-> **PREREQUISITE:** Load the following skills to execute this recipe: `gws-drive`
+> **PREREQUISITE:** Load the following skills to execute this recipe: `references/gws-drive`
 
 List and download all files from a Google Drive folder.
 

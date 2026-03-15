@@ -8,12 +8,12 @@ metadata:
     domain: "scheduling"
     requires:
       bins: ["gws"]
-      skills: ["gws-meet", "gws-gmail"]
+      skills: ["references/gws-meet", "references/gws-gmail"]
 ---
 
 # Create a Google Meet Conference
 
-> **PREREQUISITE:** Load the following skills to execute this recipe: `gws-meet`, `gws-gmail`
+> **PREREQUISITE:** Load the following skills to execute this recipe: `references/gws-meet`, `references/gws-gmail`
 
 Create a Google Meet meeting space and share the join link.
 

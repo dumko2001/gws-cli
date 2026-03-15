@@ -8,12 +8,12 @@ metadata:
     domain: "productivity"
     requires:
       bins: ["gws"]
-      skills: ["gws-drive"]
+      skills: ["references/gws-drive"]
 ---
 
 # Create and Configure a Shared Drive
 
-> **PREREQUISITE:** Load the following skills to execute this recipe: `gws-drive`
+> **PREREQUISITE:** Load the following skills to execute this recipe: `references/gws-drive`
 
 Create a Google Shared Drive and add members with appropriate roles.
 

@@ -8,12 +8,12 @@ metadata:
     domain: "productivity"
     requires:
       bins: ["gws"]
-      skills: ["gws-meet"]
+      skills: ["references/gws-meet"]
 ---
 
 # Review Google Meet Attendance
 
-> **PREREQUISITE:** Load the following skills to execute this recipe: `gws-meet`
+> **PREREQUISITE:** Load the following skills to execute this recipe: `references/gws-meet`
 
 Review who attended a Google Meet conference and for how long.
 

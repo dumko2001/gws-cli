@@ -8,12 +8,12 @@ metadata:
     domain: "engineering"
     requires:
       bins: ["gws"]
-      skills: ["gws-docs", "gws-calendar", "gws-chat"]
+      skills: ["references/gws-docs", "references/gws-calendar", "references/gws-chat"]
 ---
 
 # Set Up Post-Mortem
 
-> **PREREQUISITE:** Load the following skills to execute this recipe: `gws-docs`, `gws-calendar`, `gws-chat`
+> **PREREQUISITE:** Load the following skills to execute this recipe: `references/gws-docs`, `references/gws-calendar`, `references/gws-chat`
 
 Create a Google Docs post-mortem, schedule a Google Calendar review, and notify via Chat.
 

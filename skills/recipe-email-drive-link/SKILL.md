@@ -8,12 +8,12 @@ metadata:
     domain: "productivity"
     requires:
       bins: ["gws"]
-      skills: ["gws-drive", "gws-gmail"]
+      skills: ["references/gws-drive", "references/gws-gmail"]
 ---
 
 # Email a Google Drive File Link
 
-> **PREREQUISITE:** Load the following skills to execute this recipe: `gws-drive`, `gws-gmail`
+> **PREREQUISITE:** Load the following skills to execute this recipe: `references/gws-drive`, `references/gws-gmail`
 
 Share a Google Drive file and email the link with a message to recipients.
 

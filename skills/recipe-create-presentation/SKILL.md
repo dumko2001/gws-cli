@@ -8,12 +8,12 @@ metadata:
     domain: "productivity"
     requires:
       bins: ["gws"]
-      skills: ["gws-slides"]
+      skills: ["references/gws-slides"]
 ---
 
 # Create a Google Slides Presentation
 
-> **PREREQUISITE:** Load the following skills to execute this recipe: `gws-slides`
+> **PREREQUISITE:** Load the following skills to execute this recipe: `references/gws-slides`
 
 Create a new Google Slides presentation and add initial slides.
 

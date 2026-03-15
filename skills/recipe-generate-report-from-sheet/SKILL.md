@@ -8,12 +8,12 @@ metadata:
     domain: "productivity"
     requires:
       bins: ["gws"]
-      skills: ["gws-sheets", "gws-docs", "gws-drive"]
+      skills: ["references/gws-sheets", "references/gws-docs", "references/gws-drive"]
 ---
 
 # Generate a Google Docs Report from Sheet Data
 
-> **PREREQUISITE:** Load the following skills to execute this recipe: `gws-sheets`, `gws-docs`, `gws-drive`
+> **PREREQUISITE:** Load the following skills to execute this recipe: `references/gws-sheets`, `references/gws-docs`, `references/gws-drive`
 
 Read data from a Google Sheet and create a formatted Google Docs report.
 

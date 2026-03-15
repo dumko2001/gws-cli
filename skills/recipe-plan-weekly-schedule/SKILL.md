@@ -8,12 +8,12 @@ metadata:
     domain: "scheduling"
     requires:
       bins: ["gws"]
-      skills: ["gws-calendar"]
+      skills: ["references/gws-calendar"]
 ---
 
 # Plan Your Weekly Google Calendar Schedule
 
-> **PREREQUISITE:** Load the following skills to execute this recipe: `gws-calendar`
+> **PREREQUISITE:** Load the following skills to execute this recipe: `references/gws-calendar`
 
 Review your Google Calendar week, identify gaps, and add events to fill them.
 

@@ -7,12 +7,12 @@ metadata:
     category: "persona"
     requires:
       bins: ["gws"]
-      skills: ["gws-gmail", "gws-drive", "gws-calendar"]
+      skills: ["references/gws-gmail", "references/gws-drive", "references/gws-calendar"]
 ---
 
 # IT Administrator
 
-> **PREREQUISITE:** Load the following utility skills to operate as this persona: `gws-gmail`, `gws-drive`, `gws-calendar`
+> **PREREQUISITE:** Load the following utility skills to operate as this persona: `references/gws-gmail`, `references/gws-drive`, `references/gws-calendar`
 
 Administer IT — monitor security and configure Workspace.
 

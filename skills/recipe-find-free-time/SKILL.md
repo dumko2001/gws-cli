@@ -8,12 +8,12 @@ metadata:
     domain: "scheduling"
     requires:
       bins: ["gws"]
-      skills: ["gws-calendar"]
+      skills: ["references/gws-calendar"]
 ---
 
 # Find Free Time Across Calendars
 
-> **PREREQUISITE:** Load the following skills to execute this recipe: `gws-calendar`
+> **PREREQUISITE:** Load the following skills to execute this recipe: `references/gws-calendar`
 
 Query Google Calendar free/busy status for multiple users to find a meeting slot.
 

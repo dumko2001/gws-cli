@@ -8,12 +8,12 @@ metadata:
     domain: "productivity"
     requires:
       bins: ["gws"]
-      skills: ["gws-forms"]
+      skills: ["references/gws-forms"]
 ---
 
 # Check Form Responses
 
-> **PREREQUISITE:** Load the following skills to execute this recipe: `gws-forms`
+> **PREREQUISITE:** Load the following skills to execute this recipe: `references/gws-forms`
 
 Retrieve and review responses from a Google Form.
 

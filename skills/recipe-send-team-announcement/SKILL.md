@@ -8,12 +8,12 @@ metadata:
     domain: "communication"
     requires:
       bins: ["gws"]
-      skills: ["gws-gmail", "gws-chat"]
+      skills: ["references/gws-gmail", "references/gws-chat"]
 ---
 
 # Announce via Gmail and Google Chat
 
-> **PREREQUISITE:** Load the following skills to execute this recipe: `gws-gmail`, `gws-chat`
+> **PREREQUISITE:** Load the following skills to execute this recipe: `references/gws-gmail`, `references/gws-chat`
 
 Send a team announcement via both Gmail and a Google Chat space.
 

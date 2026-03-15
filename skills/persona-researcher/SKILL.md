@@ -7,12 +7,12 @@ metadata:
     category: "persona"
     requires:
       bins: ["gws"]
-      skills: ["gws-drive", "gws-docs", "gws-sheets", "gws-gmail"]
+      skills: ["references/gws-drive", "references/gws-docs", "references/gws-sheets", "references/gws-gmail"]
 ---
 
 # Researcher
 
-> **PREREQUISITE:** Load the following utility skills to operate as this persona: `gws-drive`, `gws-docs`, `gws-sheets`, `gws-gmail`
+> **PREREQUISITE:** Load the following utility skills to operate as this persona: `references/gws-drive`, `references/gws-docs`, `references/gws-sheets`, `references/gws-gmail`
 
 Organize research — manage references, notes, and collaboration.
 

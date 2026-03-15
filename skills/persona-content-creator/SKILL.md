@@ -7,12 +7,12 @@ metadata:
     category: "persona"
     requires:
       bins: ["gws"]
-      skills: ["gws-docs", "gws-drive", "gws-gmail", "gws-chat", "gws-slides"]
+      skills: ["references/gws-docs", "references/gws-drive", "references/gws-gmail", "references/gws-chat", "references/gws-slides"]
 ---
 
 # Content Creator
 
-> **PREREQUISITE:** Load the following utility skills to operate as this persona: `gws-docs`, `gws-drive`, `gws-gmail`, `gws-chat`, `gws-slides`
+> **PREREQUISITE:** Load the following utility skills to operate as this persona: `references/gws-docs`, `references/gws-drive`, `references/gws-gmail`, `references/gws-chat`, `references/gws-slides`
 
 Create, organize, and distribute content across Workspace.
 

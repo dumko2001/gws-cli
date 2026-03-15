@@ -7,12 +7,12 @@ metadata:
     category: "persona"
     requires:
       bins: ["gws"]
-      skills: ["gws-calendar", "gws-gmail", "gws-drive", "gws-chat", "gws-sheets"]
+      skills: ["references/gws-calendar", "references/gws-gmail", "references/gws-drive", "references/gws-chat", "references/gws-sheets"]
 ---
 
 # Event Coordinator
 
-> **PREREQUISITE:** Load the following utility skills to operate as this persona: `gws-calendar`, `gws-gmail`, `gws-drive`, `gws-chat`, `gws-sheets`
+> **PREREQUISITE:** Load the following utility skills to operate as this persona: `references/gws-calendar`, `references/gws-gmail`, `references/gws-drive`, `references/gws-chat`, `references/gws-sheets`
 
 Plan and manage events — scheduling, invitations, and logistics.
 

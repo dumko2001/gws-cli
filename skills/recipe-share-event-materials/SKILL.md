@@ -8,12 +8,12 @@ metadata:
     domain: "productivity"
     requires:
       bins: ["gws"]
-      skills: ["gws-calendar", "gws-drive"]
+      skills: ["references/gws-calendar", "references/gws-drive"]
 ---
 
 # Share Files with Meeting Attendees
 
-> **PREREQUISITE:** Load the following skills to execute this recipe: `gws-calendar`, `gws-drive`
+> **PREREQUISITE:** Load the following skills to execute this recipe: `references/gws-calendar`, `references/gws-drive`
 
 Share Google Drive files with all attendees of a Google Calendar event.
 

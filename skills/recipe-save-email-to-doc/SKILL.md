@@ -8,12 +8,12 @@ metadata:
     domain: "productivity"
     requires:
       bins: ["gws"]
-      skills: ["gws-gmail", "gws-docs"]
+      skills: ["references/gws-gmail", "references/gws-docs"]
 ---
 
 # Save a Gmail Message to Google Docs
 
-> **PREREQUISITE:** Load the following skills to execute this recipe: `gws-gmail`, `gws-docs`
+> **PREREQUISITE:** Load the following skills to execute this recipe: `references/gws-gmail`, `references/gws-docs`
 
 Save a Gmail message body into a Google Doc for archival or reference.
 

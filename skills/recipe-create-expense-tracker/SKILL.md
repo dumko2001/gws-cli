@@ -8,12 +8,12 @@ metadata:
     domain: "productivity"
     requires:
       bins: ["gws"]
-      skills: ["gws-sheets", "gws-drive"]
+      skills: ["references/gws-sheets", "references/gws-drive"]
 ---
 
 # Create a Google Sheets Expense Tracker
 
-> **PREREQUISITE:** Load the following skills to execute this recipe: `gws-sheets`, `gws-drive`
+> **PREREQUISITE:** Load the following skills to execute this recipe: `references/gws-sheets`, `references/gws-drive`
 
 Set up a Google Sheets spreadsheet for tracking expenses with headers and initial entries.
 

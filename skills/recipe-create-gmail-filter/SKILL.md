@@ -8,12 +8,12 @@ metadata:
     domain: "productivity"
     requires:
       bins: ["gws"]
-      skills: ["gws-gmail"]
+      skills: ["references/gws-gmail"]
 ---
 
 # Create a Gmail Filter
 
-> **PREREQUISITE:** Load the following skills to execute this recipe: `gws-gmail`
+> **PREREQUISITE:** Load the following skills to execute this recipe: `references/gws-gmail`
 
 Create a Gmail filter to automatically label, star, or categorize incoming messages.
 

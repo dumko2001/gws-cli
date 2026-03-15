@@ -7,12 +7,12 @@ metadata:
     category: "persona"
     requires:
       bins: ["gws"]
-      skills: ["gws-calendar", "gws-gmail", "gws-chat", "gws-drive", "gws-sheets"]
+      skills: ["references/gws-calendar", "references/gws-gmail", "references/gws-chat", "references/gws-drive", "references/gws-sheets"]
 ---
 
 # Team Lead
 
-> **PREREQUISITE:** Load the following utility skills to operate as this persona: `gws-calendar`, `gws-gmail`, `gws-chat`, `gws-drive`, `gws-sheets`
+> **PREREQUISITE:** Load the following utility skills to operate as this persona: `references/gws-calendar`, `references/gws-gmail`, `references/gws-chat`, `references/gws-drive`, `references/gws-sheets`
 
 Lead a team — run standups, coordinate tasks, and communicate.
 

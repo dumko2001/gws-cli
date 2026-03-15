@@ -8,12 +8,12 @@ metadata:
     domain: "productivity"
     requires:
       bins: ["gws"]
-      skills: ["gws-drive", "gws-docs", "gws-gmail"]
+      skills: ["references/gws-drive", "references/gws-docs", "references/gws-gmail"]
 ---
 
 # Share a Google Doc and Notify Collaborators
 
-> **PREREQUISITE:** Load the following skills to execute this recipe: `gws-drive`, `gws-docs`, `gws-gmail`
+> **PREREQUISITE:** Load the following skills to execute this recipe: `references/gws-drive`, `references/gws-docs`, `references/gws-gmail`
 
 Share a Google Docs document with edit access and email collaborators the link.
 

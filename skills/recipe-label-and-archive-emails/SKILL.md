@@ -8,12 +8,12 @@ metadata:
     domain: "productivity"
     requires:
       bins: ["gws"]
-      skills: ["gws-gmail"]
+      skills: ["references/gws-gmail"]
 ---
 
 # Label and Archive Gmail Threads
 
-> **PREREQUISITE:** Load the following skills to execute this recipe: `gws-gmail`
+> **PREREQUISITE:** Load the following skills to execute this recipe: `references/gws-gmail`
 
 Apply Gmail labels to matching messages and archive them to keep your inbox clean.
 

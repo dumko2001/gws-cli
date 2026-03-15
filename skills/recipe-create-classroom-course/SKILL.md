@@ -8,12 +8,12 @@ metadata:
     domain: "education"
     requires:
       bins: ["gws"]
-      skills: ["gws-classroom"]
+      skills: ["references/gws-classroom"]
 ---
 
 # Create a Google Classroom Course
 
-> **PREREQUISITE:** Load the following skills to execute this recipe: `gws-classroom`
+> **PREREQUISITE:** Load the following skills to execute this recipe: `references/gws-classroom`
 
 Create a Google Classroom course and invite students.
 

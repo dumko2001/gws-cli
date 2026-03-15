@@ -7,12 +7,12 @@ metadata:
     category: "persona"
     requires:
       bins: ["gws"]
-      skills: ["gws-drive", "gws-sheets", "gws-calendar", "gws-gmail", "gws-chat"]
+      skills: ["references/gws-drive", "references/gws-sheets", "references/gws-calendar", "references/gws-gmail", "references/gws-chat"]
 ---
 
 # Project Manager
 
-> **PREREQUISITE:** Load the following utility skills to operate as this persona: `gws-drive`, `gws-sheets`, `gws-calendar`, `gws-gmail`, `gws-chat`
+> **PREREQUISITE:** Load the following utility skills to operate as this persona: `references/gws-drive`, `references/gws-sheets`, `references/gws-calendar`, `references/gws-gmail`, `references/gws-chat`
 
 Coordinate projects — track tasks, schedule meetings, and share docs.
 

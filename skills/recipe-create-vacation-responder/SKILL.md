@@ -8,12 +8,12 @@ metadata:
     domain: "productivity"
     requires:
       bins: ["gws"]
-      skills: ["gws-gmail"]
+      skills: ["references/gws-gmail"]
 ---
 
 # Set Up a Gmail Vacation Responder
 
-> **PREREQUISITE:** Load the following skills to execute this recipe: `gws-gmail`
+> **PREREQUISITE:** Load the following skills to execute this recipe: `references/gws-gmail`
 
 Enable a Gmail out-of-office auto-reply with a custom message and date range.
 

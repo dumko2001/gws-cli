@@ -8,12 +8,12 @@ metadata:
     domain: "sales"
     requires:
       bins: ["gws"]
-      skills: ["gws-sheets", "gws-drive"]
+      skills: ["references/gws-sheets", "references/gws-drive"]
 ---
 
 # Log Deal Update to Sheet
 
-> **PREREQUISITE:** Load the following skills to execute this recipe: `gws-sheets`, `gws-drive`
+> **PREREQUISITE:** Load the following skills to execute this recipe: `references/gws-sheets`, `references/gws-drive`
 
 Append a deal status update to a Google Sheets sales tracking spreadsheet.
 

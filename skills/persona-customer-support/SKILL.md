@@ -7,12 +7,12 @@ metadata:
     category: "persona"
     requires:
       bins: ["gws"]
-      skills: ["gws-gmail", "gws-sheets", "gws-chat", "gws-calendar"]
+      skills: ["references/gws-gmail", "references/gws-sheets", "references/gws-chat", "references/gws-calendar"]
 ---
 
 # Customer Support Agent
 
-> **PREREQUISITE:** Load the following utility skills to operate as this persona: `gws-gmail`, `gws-sheets`, `gws-chat`, `gws-calendar`
+> **PREREQUISITE:** Load the following utility skills to operate as this persona: `references/gws-gmail`, `references/gws-sheets`, `references/gws-chat`, `references/gws-calendar`
 
 Manage customer support — track tickets, respond, escalate issues.
 

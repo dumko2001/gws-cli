@@ -8,12 +8,12 @@ metadata:
     domain: "productivity"
     requires:
       bins: ["gws"]
-      skills: ["gws-drive"]
+      skills: ["references/gws-drive"]
 ---
 
 # Share a Google Drive Folder with a Team
 
-> **PREREQUISITE:** Load the following skills to execute this recipe: `gws-drive`
+> **PREREQUISITE:** Load the following skills to execute this recipe: `references/gws-drive`
 
 Share a Google Drive folder and all its contents with a list of collaborators.
 

@@ -8,12 +8,12 @@ metadata:
     domain: "productivity"
     requires:
       bins: ["gws"]
-      skills: ["gws-tasks"]
+      skills: ["references/gws-tasks"]
 ---
 
 # Create a Task List and Add Tasks
 
-> **PREREQUISITE:** Load the following skills to execute this recipe: `gws-tasks`
+> **PREREQUISITE:** Load the following skills to execute this recipe: `references/gws-tasks`
 
 Set up a new Google Tasks list with initial tasks.
 

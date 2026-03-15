@@ -8,12 +8,12 @@ metadata:
     domain: "productivity"
     requires:
       bins: ["gws"]
-      skills: ["gws-drive"]
+      skills: ["references/gws-drive"]
 ---
 
 # Find Largest Files in Drive
 
-> **PREREQUISITE:** Load the following skills to execute this recipe: `gws-drive`
+> **PREREQUISITE:** Load the following skills to execute this recipe: `references/gws-drive`
 
 Identify large Google Drive files consuming storage quota.
 

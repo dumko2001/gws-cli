@@ -8,12 +8,12 @@ metadata:
     domain: "productivity"
     requires:
       bins: ["gws"]
-      skills: ["gws-drive"]
+      skills: ["references/gws-drive"]
 ---
 
 # Organize Files into Google Drive Folders
 
-> **PREREQUISITE:** Load the following skills to execute this recipe: `gws-drive`
+> **PREREQUISITE:** Load the following skills to execute this recipe: `references/gws-drive`
 
 Create a Google Drive folder structure and move files into the right locations.
 

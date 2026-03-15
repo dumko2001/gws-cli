@@ -8,12 +8,12 @@ metadata:
     domain: "productivity"
     requires:
       bins: ["gws"]
-      skills: ["gws-drive", "gws-docs"]
+      skills: ["references/gws-drive", "references/gws-docs"]
 ---
 
 # Create a Google Doc from a Template
 
-> **PREREQUISITE:** Load the following skills to execute this recipe: `gws-drive`, `gws-docs`
+> **PREREQUISITE:** Load the following skills to execute this recipe: `references/gws-drive`, `references/gws-docs`
 
 Copy a Google Docs template, fill in content, and share with collaborators.
 

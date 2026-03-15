@@ -8,12 +8,12 @@ metadata:
     domain: "productivity"
     requires:
       bins: ["gws"]
-      skills: ["gws-sheets", "gws-calendar"]
+      skills: ["references/gws-sheets", "references/gws-calendar"]
 ---
 
 # Create Google Calendar Events from a Sheet
 
-> **PREREQUISITE:** Load the following skills to execute this recipe: `gws-sheets`, `gws-calendar`
+> **PREREQUISITE:** Load the following skills to execute this recipe: `references/gws-sheets`, `references/gws-calendar`
 
 Read event data from a Google Sheets spreadsheet and create Google Calendar entries for each row.
 

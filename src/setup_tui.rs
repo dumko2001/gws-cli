@@ -30,7 +30,6 @@ use ratatui::{
     widgets::{Block, Borders, List, ListItem, ListState, Paragraph},
     DefaultTerminal,
 };
-use ratatui::prelude::Stylize;
 use std::io::stdout;
 
 /// An item in the multi-select list.

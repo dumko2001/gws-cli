@@ -7,12 +7,12 @@ metadata:
     category: "persona"
     requires:
       bins: ["gws"]
-      skills: ["gws-gmail", "gws-calendar", "gws-sheets", "gws-drive"]
+      skills: ["references/gws-gmail", "references/gws-calendar", "references/gws-sheets", "references/gws-drive"]
 ---
 
 # Sales Operations
 
-> **PREREQUISITE:** Load the following utility skills to operate as this persona: `gws-gmail`, `gws-calendar`, `gws-sheets`, `gws-drive`
+> **PREREQUISITE:** Load the following utility skills to operate as this persona: `references/gws-gmail`, `references/gws-calendar`, `references/gws-sheets`, `references/gws-drive`
 
 Manage sales workflows — track deals, schedule calls, client comms.
 

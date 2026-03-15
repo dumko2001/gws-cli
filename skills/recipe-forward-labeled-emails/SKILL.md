@@ -8,12 +8,12 @@ metadata:
     domain: "productivity"
     requires:
       bins: ["gws"]
-      skills: ["gws-gmail"]
+      skills: ["references/gws-gmail"]
 ---
 
 # Forward Labeled Gmail Messages
 
-> **PREREQUISITE:** Load the following skills to execute this recipe: `gws-gmail`
+> **PREREQUISITE:** Load the following skills to execute this recipe: `references/gws-gmail`
 
 Find Gmail messages with a specific label and forward them to another address.
 

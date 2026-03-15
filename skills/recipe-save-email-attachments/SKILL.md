@@ -8,12 +8,12 @@ metadata:
     domain: "productivity"
     requires:
       bins: ["gws"]
-      skills: ["gws-gmail", "gws-drive"]
+      skills: ["references/gws-gmail", "references/gws-drive"]
 ---
 
 # Save Gmail Attachments to Google Drive
 
-> **PREREQUISITE:** Load the following skills to execute this recipe: `gws-gmail`, `gws-drive`
+> **PREREQUISITE:** Load the following skills to execute this recipe: `references/gws-gmail`, `references/gws-drive`
 
 Find Gmail messages with attachments and save them to a Google Drive folder.
 

@@ -8,12 +8,12 @@ metadata:
     domain: "engineering"
     requires:
       bins: ["gws"]
-      skills: ["gws-events"]
+      skills: ["references/gws-events"]
 ---
 
 # Watch for Drive Changes
 
-> **PREREQUISITE:** Load the following skills to execute this recipe: `gws-events`
+> **PREREQUISITE:** Load the following skills to execute this recipe: `references/gws-events`
 
 Subscribe to change notifications on a Google Drive file or folder.
 

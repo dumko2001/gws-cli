@@ -37,6 +37,7 @@ mod schema;
 mod services;
 mod setup;
 mod setup_tui;
+mod skills_search;
 mod text;
 mod timezone;
 mod token_storage;
@@ -135,6 +136,12 @@ async fn run() -> Result<(), GwsError> {
     if first_arg == "auth" {
         let auth_args: Vec<String> = args.iter().skip(2).cloned().collect();
         return auth_commands::handle_auth_command(&auth_args).await;
+    }
+
+    // Handle the `skills` command
+    if first_arg == "skills" {
+        let skills_args: Vec<String> = args.iter().skip(2).cloned().collect();
+        return skills_search::handle_skills_command(&skills_args).await;
     }
 
     // Parse service name and optional version override
@@ -420,6 +427,7 @@ fn print_usage() {
     println!("USAGE:");
     println!("    gws <service> <resource> [sub-resource] <method> [flags]");
     println!("    gws schema <service.resource.method> [--resolve-refs]");
+    println!("    gws skills search <query>");
     println!();
     println!("EXAMPLES:");
     println!("    gws drive files list --params '{{\"pageSize\": 10}}'");
@@ -427,6 +435,7 @@ fn print_usage() {
     println!("    gws sheets spreadsheets get --params '{{\"spreadsheetId\": \"...\"}}'");
     println!("    gws gmail users messages list --params '{{\"userId\": \"me\"}}'");
     println!("    gws schema drive.files.list");
+    println!("    gws skills search \"how to send an email\"");
     println!();
     println!("FLAGS:");
     println!("    --params <JSON>       URL/Query parameters as JSON");

@@ -8,12 +8,12 @@ metadata:
     domain: "productivity"
     requires:
       bins: ["gws"]
-      skills: ["gws-forms", "gws-gmail"]
+      skills: ["references/gws-forms", "references/gws-gmail"]
 ---
 
 # Create and Share a Google Form
 
-> **PREREQUISITE:** Load the following skills to execute this recipe: `gws-forms`, `gws-gmail`
+> **PREREQUISITE:** Load the following skills to execute this recipe: `references/gws-forms`, `references/gws-gmail`
 
 Create a Google Form for feedback and share it via Gmail.
 

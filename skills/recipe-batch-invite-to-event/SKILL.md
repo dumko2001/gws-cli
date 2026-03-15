@@ -8,12 +8,12 @@ metadata:
     domain: "scheduling"
     requires:
       bins: ["gws"]
-      skills: ["gws-calendar"]
+      skills: ["references/gws-calendar"]
 ---
 
 # Add Multiple Attendees to a Calendar Event
 
-> **PREREQUISITE:** Load the following skills to execute this recipe: `gws-calendar`
+> **PREREQUISITE:** Load the following skills to execute this recipe: `references/gws-calendar`
 
 Add a list of attendees to an existing Google Calendar event and send notifications.
 

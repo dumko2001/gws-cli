@@ -8,12 +8,12 @@ metadata:
     domain: "productivity"
     requires:
       bins: ["gws"]
-      skills: ["gws-people", "gws-sheets"]
+      skills: ["references/gws-people", "references/gws-sheets"]
 ---
 
 # Export Google Contacts to Sheets
 
-> **PREREQUISITE:** Load the following skills to execute this recipe: `gws-people`, `gws-sheets`
+> **PREREQUISITE:** Load the following skills to execute this recipe: `references/gws-people`, `references/gws-sheets`
 
 Export Google Contacts directory to a Google Sheets spreadsheet.
 

@@ -8,12 +8,12 @@ metadata:
     domain: "scheduling"
     requires:
       bins: ["gws"]
-      skills: ["gws-calendar"]
+      skills: ["references/gws-calendar"]
 ---
 
 # Reschedule a Google Calendar Meeting
 
-> **PREREQUISITE:** Load the following skills to execute this recipe: `gws-calendar`
+> **PREREQUISITE:** Load the following skills to execute this recipe: `references/gws-calendar`
 
 Move a Google Calendar event to a new time and automatically notify all attendees.
 

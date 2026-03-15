@@ -8,12 +8,12 @@ metadata:
     domain: "productivity"
     requires:
       bins: ["gws"]
-      skills: ["gws-sheets", "gws-drive"]
+      skills: ["references/gws-sheets", "references/gws-drive"]
 ---
 
 # Export a Google Sheet as CSV
 
-> **PREREQUISITE:** Load the following skills to execute this recipe: `gws-sheets`, `gws-drive`
+> **PREREQUISITE:** Load the following skills to execute this recipe: `references/gws-sheets`, `references/gws-drive`
 
 Export a Google Sheets spreadsheet as a CSV file for local backup or processing.
 

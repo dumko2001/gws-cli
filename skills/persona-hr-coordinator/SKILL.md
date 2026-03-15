@@ -7,12 +7,12 @@ metadata:
     category: "persona"
     requires:
       bins: ["gws"]
-      skills: ["gws-gmail", "gws-calendar", "gws-drive", "gws-chat"]
+      skills: ["references/gws-gmail", "references/gws-calendar", "references/gws-drive", "references/gws-chat"]
 ---
 
 # HR Coordinator
 
-> **PREREQUISITE:** Load the following utility skills to operate as this persona: `gws-gmail`, `gws-calendar`, `gws-drive`, `gws-chat`
+> **PREREQUISITE:** Load the following utility skills to operate as this persona: `references/gws-gmail`, `references/gws-calendar`, `references/gws-drive`, `references/gws-chat`
 
 Handle HR workflows — onboarding, announcements, and employee comms.
 

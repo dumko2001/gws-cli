@@ -11,6 +11,15 @@ metadata:
 
 # gws — Shared Reference
 
+## Discovery & Search
+
+With 40+ API services and hundreds of methods, use the search command to find the right tool for a task:
+
+```bash
+gws skills search "send email"
+gws skills search "upload file"
+```
+
 ## Installation
 
 The `gws` binary must be on `$PATH`. See the project README for install options.
