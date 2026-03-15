@@ -515,6 +515,11 @@ mod tests {
                 Arg::new("attendee")
                     .long("attendee")
                     .action(ArgAction::Append),
+            )
+            .arg(
+                Arg::new("meet")
+                    .long("meet")
+                    .action(ArgAction::SetTrue),
             );
         cmd.try_get_matches_from(args).unwrap()
     }
@@ -537,6 +542,26 @@ mod tests {
         assert!(body.contains("Meeting"));
         assert!(body.contains("2024-01-01T10:00:00Z"));
         assert_eq!(scopes[0], "https://scope");
+    }
+
+    #[test]
+    fn test_build_insert_request_with_meet() {
+        let doc = make_mock_doc();
+        let matches = make_matches_insert(&[
+            "test",
+            "--summary",
+            "Meeting",
+            "--start",
+            "2024-01-01T10:00:00Z",
+            "--end",
+            "2024-01-01T11:00:00Z",
+            "--meet",
+        ]);
+        let (params, body, _) = build_insert_request(&matches, &doc).unwrap();
+
+        assert!(params.contains("\"conferenceDataVersion\":1"));
+        assert!(body.contains("\"conferenceSolutionKey\":{\"type\":\"hangoutsMeet\"}"));
+        assert!(body.contains("\"requestId\":"));
     }
 
     #[test]
