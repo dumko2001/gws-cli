@@ -486,7 +486,11 @@ fn build_insert_request(
                 map.insert("description".to_string(), json!(desc));
             }
             if !attendees.is_empty() {
-                map.insert("attendees".to_string(), json!(attendees));
+                let attendees_list_for_seed: Vec<_> = attendees
+                    .iter()
+                    .map(|email| json!({ "email": email }))
+                    .collect();
+                map.insert("attendees".to_string(), json!(attendees_list_for_seed));
             }
             serde_json::Value::Object(map)
         };
