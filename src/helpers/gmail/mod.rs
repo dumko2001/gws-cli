@@ -632,6 +632,20 @@ pub(super) fn build_raw_send_body(raw_message: &str, thread_id: Option<&str>) ->
     Value::Object(body)
 }
 
+/// Returns true if the method is a Gmail send operation.
+pub fn is_send_method(method: &crate::discovery::RestMethod, path: &[String]) -> bool {
+    if let Some(ref id) = method.id {
+        id == "gmail.users.messages.send" || id == "gmail.users.drafts.send"
+    } else {
+        // Fallback to Discovery path if ID is missing.
+        // Standard Gmail send path: users/{userId}/messages/send
+        path.len() == 3
+            && path[0] == "users"
+            && (path[1] == "messages" || path[1] == "drafts")
+            && path[2] == "send"
+    }
+}
+
 pub(super) async fn send_raw_email(
     doc: &crate::discovery::RestDescription,
     matches: &ArgMatches,

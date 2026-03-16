@@ -382,20 +382,6 @@ pub async fn execute_method(
 ) -> Result<Option<Value>, GwsError> {
     let input = parse_and_validate_inputs(doc, method, params_json, body_json, upload_path)?;
 
-    // Gmail-specific safety policy: block sending if draft-only mode is active
-    if policy.draft_only && !dry_run && doc.name == "gmail" {
-        let is_send = if let Some(ref id) = method.id {
-            id == "gmail.users.messages.send" || id == "gmail.users.drafts.send"
-        } else {
-            // Fallback to Discovery path if ID is missing.
-            // Standard Gmail send path: users/{userId}/messages/send
-            method.path.contains("messages/send") || method.path.contains("drafts/send")
-        };
-
-        if is_send {
-            return Err(GwsError::Validation("Gmail draft-only mode is active. Sending mail is blocked (preparing a draft is still allowed).".to_string()));
-        }
-    }
 
     if dry_run {
         let dry_run_info = json!({

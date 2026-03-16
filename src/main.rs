@@ -219,17 +219,7 @@ async fn run() -> Result<(), GwsError> {
     // We check this here to trigger BEFORE authentication for raw commands.
     let dry_run = matched_args.get_flag("dry-run");
     if draft_only && !dry_run && api_name == "gmail" {
-        let is_send = if let Some(ref id) = method.id {
-            id == "gmail.users.messages.send" || id == "gmail.users.drafts.send"
-        } else {
-            // Fallback to Discovery path if ID is missing (suggested by previous review for robustness)
-            method_path.len() == 3
-                && method_path[0] == "users"
-                && (method_path[1] == "messages" || method_path[1] == "drafts")
-                && method_path[2] == "send"
-        };
-
-        if is_send {
+        if helpers::gmail::is_send_method(method, &method_path) {
             return Err(GwsError::Validation(
                 "Gmail send operation blocked by --draft-only policy. Use --dry-run for oversight."
                     .to_string(),
@@ -270,12 +260,15 @@ async fn run() -> Result<(), GwsError> {
         Ok(t) => (Some(t), executor::AuthMethod::OAuth),
         Err(e) => {
             // If credentials were found but failed (e.g. decryption error, invalid token),
-            // and we're not in dry-run mode, we should fail for real.
-            // If dry-run is on, we'll try to proceed without auth.
-            if !dry_run {
-                return Err(GwsError::Auth(format!("Authentication failed: {e}")));
+            // propagate the error instead of silently falling back to unauthenticated.
+            // Only fall back to None if no credentials exist at all.
+            let err_msg = format!("{e:#}");
+            // NB: matches the bail!() message in auth::load_credentials_inner
+            if err_msg.starts_with("No credentials found") {
+                (None, executor::AuthMethod::None)
+            } else {
+                return Err(GwsError::Auth(format!("Authentication failed: {err_msg}")));
             }
-            (None, executor::AuthMethod::None)
         }
     };
 
