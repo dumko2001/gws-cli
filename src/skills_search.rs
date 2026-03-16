@@ -14,9 +14,12 @@
 
 //! Search and discovery for agent skills.
 
+use crate::discovery;
 use crate::error::GwsError;
+use crate::helpers;
 use crate::registry::{PersonaRegistry, RecipeRegistry, PERSONAS_YAML, RECIPES_YAML};
 use crate::services;
+use clap::Command;
 
 /// Entry point for `gws skills search <query>`.
 pub async fn handle_skills_command(args: &[String]) -> Result<(), GwsError> {
@@ -26,14 +29,13 @@ pub async fn handle_skills_command(args: &[String]) -> Result<(), GwsError> {
         ));
     }
 
-    let query = args
-        .get(1)
-        .ok_or_else(|| {
-            GwsError::Validation(
-                "No search query provided. Usage: gws skills search <query>".to_string(),
-            )
-        })?
-        .to_lowercase();
+    if args.len() < 2 {
+        return Err(GwsError::Validation(
+            "No search query provided. Usage: gws skills search <query>".to_string(),
+        ));
+    }
+
+    let query = args[1..].join(" ").to_lowercase();
 
     println!("Searching for skills matching \"{}\"...\n", query);
 
@@ -54,6 +56,38 @@ pub async fn handle_skills_command(args: &[String]) -> Result<(), GwsError> {
                 svc.aliases[0]
             );
             results += 1;
+        }
+    }
+
+    // Search Helpers
+    for svc in services::SERVICES {
+        if let Some(helper) = helpers::get_helper(svc.api_name) {
+            let cli = Command::new(svc.api_name);
+            let doc = discovery::RestDescription {
+                name: svc.api_name.to_string(),
+                ..Default::default()
+            };
+            let cli_with_helpers = helper.inject_commands(cli, &doc);
+            for sub in cli_with_helpers.get_subcommands() {
+                let name = sub.get_name();
+                if name.starts_with('+') {
+                    let short_name = name.trim_start_matches('+');
+                    let full_helper_name = format!("gws-{}-{}", svc.aliases[0], short_name);
+                    let about = sub.get_about().map(|s| s.to_string()).unwrap_or_default();
+                    let about_clean = about.strip_prefix("[Helper] ").unwrap_or(&about);
+
+                    if full_helper_name.to_lowercase().contains(&query)
+                        || about_clean.to_lowercase().contains(&query)
+                    {
+                        println!("[Helper] {} - {}", full_helper_name, about_clean);
+                        println!(
+                            "  Reference: skills/references/{}/SKILL.md\n",
+                            full_helper_name
+                        );
+                        results += 1;
+                    }
+                }
+            }
         }
     }
 
