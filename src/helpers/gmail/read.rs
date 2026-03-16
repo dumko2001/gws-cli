@@ -49,22 +49,22 @@ pub(super) async fn handle_read(
     }
 
     if show_headers {
-        writeln!(stdout, "From: {}", sanitize_terminal_output(&original.from))
-            .context("Failed to write 'From' header")?;
-        writeln!(stdout, "To: {}", sanitize_terminal_output(&original.to))
-            .context("Failed to write 'To' header")?;
-        if !original.cc.is_empty() {
-            writeln!(stdout, "Cc: {}", sanitize_terminal_output(&original.cc))
-                .context("Failed to write 'Cc' header")?;
+        let headers_to_show = [
+            ("From", &original.from),
+            ("To", &original.to),
+            ("Cc", &original.cc),
+            ("Subject", &original.subject),
+            ("Date", &original.date),
+        ];
+        for (name, value) in headers_to_show {
+            if value.is_empty() {
+                continue;
+            }
+            // Replace newlines to prevent header spoofing in the output, then sanitize.
+            let sanitized_value = sanitize_terminal_output(&value.replace(['\r', '\n'], " "));
+            writeln!(stdout, "{}: {}", name, sanitized_value)
+                .with_context(|| format!("Failed to write '{name}' header"))?;
         }
-        writeln!(
-            stdout,
-            "Subject: {}",
-            sanitize_terminal_output(&original.subject)
-        )
-        .context("Failed to write 'Subject' header")?;
-        writeln!(stdout, "Date: {}", sanitize_terminal_output(&original.date))
-            .context("Failed to write 'Date' header")?;
         writeln!(stdout, "---").context("Failed to write header separator")?;
     }
 
