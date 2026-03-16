@@ -20,9 +20,7 @@ pub(super) async fn handle_read(
     _doc: &crate::discovery::RestDescription,
     matches: &ArgMatches,
 ) -> Result<(), GwsError> {
-    let message_id = matches
-        .get_one::<String>("id")
-        .unwrap();
+    let message_id = matches.get_one::<String>("id").unwrap();
 
     let dry_run = matches.get_flag("dry-run");
 
@@ -55,13 +53,17 @@ pub(super) async fn handle_read(
     }
 
     if show_headers {
-        writeln!(stdout, "From: {}", original.from).map_err(|e| GwsError::Other(anyhow::anyhow!(e)))?;
+        writeln!(stdout, "From: {}", original.from)
+            .map_err(|e| GwsError::Other(anyhow::anyhow!(e)))?;
         writeln!(stdout, "To: {}", original.to).map_err(|e| GwsError::Other(anyhow::anyhow!(e)))?;
         if !original.cc.is_empty() {
-            writeln!(stdout, "Cc: {}", original.cc).map_err(|e| GwsError::Other(anyhow::anyhow!(e)))?;
+            writeln!(stdout, "Cc: {}", original.cc)
+                .map_err(|e| GwsError::Other(anyhow::anyhow!(e)))?;
         }
-        writeln!(stdout, "Subject: {}", original.subject).map_err(|e| GwsError::Other(anyhow::anyhow!(e)))?;
-        writeln!(stdout, "Date: {}", original.date).map_err(|e| GwsError::Other(anyhow::anyhow!(e)))?;
+        writeln!(stdout, "Subject: {}", original.subject)
+            .map_err(|e| GwsError::Other(anyhow::anyhow!(e)))?;
+        writeln!(stdout, "Date: {}", original.date)
+            .map_err(|e| GwsError::Other(anyhow::anyhow!(e)))?;
         writeln!(stdout, "---").map_err(|e| GwsError::Other(anyhow::anyhow!(e)))?;
     }
 
