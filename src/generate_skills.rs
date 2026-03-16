@@ -20,7 +20,8 @@ use crate::commands;
 use crate::discovery;
 use crate::error::GwsError;
 use crate::registry::{
-    PersonaEntry, PersonaRegistry, RecipeEntry, RecipeRegistry, PERSONAS_YAML, RECIPES_YAML,
+    PersonaEntry, PersonaRegistry, RecipeEntry, RecipeRegistry, HELPERS, PERSONAS_YAML,
+    RECIPES_YAML,
 };
 use crate::services;
 use clap::Command;
@@ -80,21 +81,10 @@ pub async fn handle_generate_skills(args: &[String]) -> Result<(), GwsError> {
                 }
                 // If it's a specific service/helper filter and this isn't it, skip.
                 // We check if any helper might match too.
-                let mut matches_helper = false;
-                let cli = commands::build_cli(&discovery::RestDescription {
-                    name: alias.to_string(),
-                    ..Default::default()
-                });
-                for sub in cli.get_subcommands() {
-                    let name = sub.get_name();
-                    if name.starts_with('+') {
-                        let short = name.trim_start_matches('+');
-                        if format!("{alias}-{short}").contains(f) {
-                            matches_helper = true;
-                            break;
-                        }
-                    }
-                }
+                let matches_helper = HELPERS
+                    .iter()
+                    .filter(|h| h.service_alias == alias)
+                    .any(|h| format!("{alias}-{}", h.name).contains(f));
                 if !matches_helper {
                     continue;
                 }

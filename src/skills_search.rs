@@ -14,12 +14,9 @@
 
 //! Search and discovery for agent skills.
 
-use crate::discovery;
 use crate::error::GwsError;
-use crate::helpers;
-use crate::registry::{PersonaRegistry, RecipeRegistry, PERSONAS_YAML, RECIPES_YAML};
+use crate::registry::{PersonaRegistry, RecipeRegistry, HELPERS, PERSONAS_YAML, RECIPES_YAML};
 use crate::services;
-use clap::Command;
 
 fn print_skills_help() {
     println!("USAGE:");
@@ -36,6 +33,13 @@ fn print_skills_help() {
     println!("    gws skills search email");
     println!("    gws skills search \"send email\"");
     println!("    gws skills search upload file");
+}
+
+/// Returns `true` when every token in `query_tokens` appears somewhere in the
+/// space-joined, lower-cased `fields`.
+pub(crate) fn token_matches(query_tokens: &[String], fields: &[&str]) -> bool {
+    let combined = fields.join(" ").to_lowercase();
+    query_tokens.iter().all(|t| combined.contains(t.as_str()))
 }
 
 /// Entry point for `gws skills search <query>`.
@@ -67,11 +71,7 @@ pub async fn handle_skills_command(args: &[String]) -> Result<(), GwsError> {
 
     let mut results = 0;
 
-    // Returns true when every token in query_tokens appears somewhere in the combined fields.
-    let matches = |fields: &[&str]| -> bool {
-        let combined = fields.join(" ").to_lowercase();
-        query_tokens.iter().all(|t| combined.contains(t.as_str()))
-    };
+    let matches = |fields: &[&str]| token_matches(&query_tokens, fields);
 
     // Search Services
     for svc in services::SERVICES {
@@ -90,32 +90,15 @@ pub async fn handle_skills_command(args: &[String]) -> Result<(), GwsError> {
     }
 
     // Search Helpers
-    for svc in services::SERVICES {
-        if let Some(helper) = helpers::get_helper(svc.api_name) {
-            let cli = Command::new(svc.api_name);
-            let doc = discovery::RestDescription {
-                name: svc.api_name.to_string(),
-                ..Default::default()
-            };
-            let cli_with_helpers = helper.inject_commands(cli, &doc);
-            for sub in cli_with_helpers.get_subcommands() {
-                let name = sub.get_name();
-                if name.starts_with('+') {
-                    let short_name = name.trim_start_matches('+');
-                    let full_helper_name = format!("gws-{}-{}", svc.aliases[0], short_name);
-                    let about = sub.get_about().map(|s| s.to_string()).unwrap_or_default();
-                    let about_clean = about.strip_prefix("[Helper] ").unwrap_or(&about);
-
-                    if matches(&[full_helper_name.as_str(), about_clean]) {
-                        println!("[Helper] {} - {}", full_helper_name, about_clean);
-                        println!(
-                            "  Reference: skills/references/{}/SKILL.md\n",
-                            full_helper_name
-                        );
-                        results += 1;
-                    }
-                }
-            }
+    for h in HELPERS {
+        let full_helper_name = format!("gws-{}-{}", h.service_alias, h.name);
+        if matches(&[full_helper_name.as_str(), h.description]) {
+            println!("[Helper] {} - {}", full_helper_name, h.description);
+            println!(
+                "  Reference: skills/references/{}/SKILL.md\n",
+                full_helper_name
+            );
+            results += 1;
         }
     }
 
@@ -150,4 +133,59 @@ pub async fn handle_skills_command(args: &[String]) -> Result<(), GwsError> {
     }
 
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn tokens(s: &str) -> Vec<String> {
+        s.split_whitespace().map(|t| t.to_lowercase()).collect()
+    }
+
+    #[test]
+    fn single_token_matches() {
+        assert!(token_matches(&tokens("email"), &["Send an email"]));
+    }
+
+    #[test]
+    fn single_token_no_match() {
+        assert!(!token_matches(&tokens("calendar"), &["Send an email"]));
+    }
+
+    #[test]
+    fn multi_token_all_present() {
+        assert!(token_matches(
+            &tokens("send email"),
+            &["Send an email to recipients"]
+        ));
+    }
+
+    #[test]
+    fn multi_token_partial_fails() {
+        // "upload" is present but "calendar" is not
+        assert!(!token_matches(
+            &tokens("upload calendar"),
+            &["Upload a file with automatic metadata"]
+        ));
+    }
+
+    #[test]
+    fn case_insensitive() {
+        assert!(token_matches(&tokens("GMAIL"), &["gws-gmail", "Gmail API"]));
+    }
+
+    #[test]
+    fn match_across_fields() {
+        // "drive" from the service name field, "upload" from the description field
+        assert!(token_matches(
+            &tokens("drive upload"),
+            &["gws-drive-upload", "Upload a file with automatic metadata"]
+        ));
+    }
+
+    #[test]
+    fn empty_tokens_always_match() {
+        assert!(token_matches(&[], &["anything here"]));
+    }
 }
