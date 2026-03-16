@@ -141,6 +141,9 @@ set edit:completion:arg-completer[gws] = {{ |@args|
 /// Recursively find the subcommand matching the current arguments and print available next tokens.
 pub fn handle_dynamic_completion(cli: &Command, args: &[String]) {
     let completions = get_completions(cli, args);
+    // If we have no completions and we are at the top level with no args,
+    // it might be because get_completions expects at least one arg to suggest anything.
+    // (Actually get_completions on an empty list should work)
     for completion in completions {
         println!("{}", completion);
     }
@@ -150,6 +153,9 @@ fn get_completions(cli: &Command, args: &[String]) -> Vec<String> {
     let mut current_cmd = cli;
     let mut it = args.iter().peekable();
     let mut completions = Vec::new();
+
+    // Track seen flags to avoid duplicates
+    let mut seen_flags = std::collections::HashSet::new();
 
     // Skip 'gws' if present
     if let Some(&first) = it.peek() {
@@ -161,62 +167,66 @@ fn get_completions(cli: &Command, args: &[String]) -> Vec<String> {
     let mut last_arg = None;
     let mut active_flag: Option<&clap::Arg> = None;
 
-    // Walk the command tree using the provided args
+    // Walking the command tree...
     while let Some(arg) = it.next() {
         let is_last = it.peek().is_none();
 
         if arg.starts_with('-') && arg != "-" && arg != "--" {
             // This is a flag. We need to check if it takes a value and consume it
             // to avoid misinterpreting it as a subcommand.
-            let arg_def = if arg.starts_with("--") {
-                let name = arg.split('=').next().unwrap()[2..].to_string();
-                current_cmd
+            let mut arg_def = None;
+            let mut has_equals = false;
+
+            if arg.starts_with("--") {
+                let parts: Vec<&str> = arg[2..].splitn(2, '=').collect();
+                let name = parts[0];
+                has_equals = parts.len() > 1;
+                arg_def = current_cmd
                     .get_arguments()
-                    .find(|a| a.get_long() == Some(&name))
-            } else {
+                    .find(|a| a.get_long() == Some(name));
+                if let Some(def) = arg_def {
+                    if let Some(long) = def.get_long() {
+                        seen_flags.insert(long.to_string());
+                    }
+                }
+            } else if arg.len() > 1 {
                 // Short flag - handle combined flags like -vF
                 let chars: Vec<char> = arg[1..].chars().collect();
-                let mut found = None;
                 for (i, &c) in chars.iter().enumerate() {
                     if let Some(def) = current_cmd
                         .get_arguments()
                         .find(|a| a.get_short() == Some(c))
                     {
+                        if let Some(short) = def.get_short() {
+                            seen_flags.insert(short.to_string());
+                        }
                         if def.get_action().takes_values() {
                             // Only the last flag in a group can take a value
                             if i == chars.len() - 1 {
-                                found = Some(def);
+                                arg_def = Some(def);
                             }
                             break;
                         }
-                        found = Some(def);
                     }
                 }
-                found
-            };
+            }
 
             if let Some(def) = arg_def {
                 // If it's a flag that takes a value and isn't in `--key=value` form,
                 // we need to consume the next argument as its value.
-                if def.get_action().takes_values() && !arg.contains('=') {
+                if def.get_action().takes_values() && !has_equals {
                     if is_last {
                         // The flag is the last argument and it expects a value.
                         active_flag = Some(def);
                         last_arg = Some("");
                         break;
                     }
-                    if let Some(val) = it.next() {
-                        if it.peek().is_none() {
-                            // This value is the last arg, so we are completing it!
-                            active_flag = Some(def);
-                            last_arg = Some(val.as_str());
-                            break;
-                        }
-                    } else {
-                        // The flag was the last arg, but it expects a value.
-                        // We should complete for the value.
+                    // Since is_last is false, it.peek() is Some, so it.next() is guaranteed to be Some.
+                    let val = it.next().unwrap();
+                    if it.peek().is_none() {
+                        // This value is the last arg, so we are completing it!
                         active_flag = Some(def);
-                        last_arg = Some("");
+                        last_arg = Some(val.as_str());
                         break;
                     }
                 }
@@ -250,11 +260,11 @@ fn get_completions(cli: &Command, args: &[String]) -> Vec<String> {
         if let Some(pv) = val_parser.possible_values() {
             for val in pv {
                 if val.get_name().starts_with(filter) {
-                    completions.push(format!(
-                        "{}:{}",
-                        val.get_name(),
-                        val.get_help().map(|h| h.to_string()).unwrap_or_default()
-                    ));
+                    let help = val
+                        .get_help()
+                        .map(|h| h.to_string().replace('\n', " ").trim().to_string())
+                        .unwrap_or_default();
+                    completions.push(format!("{}:{}", val.get_name(), help));
                 }
             }
         }
@@ -265,8 +275,15 @@ fn get_completions(cli: &Command, args: &[String]) -> Vec<String> {
     if let Some(arg_filter) = filter.strip_prefix("--") {
         for arg in current_cmd.get_arguments() {
             if let Some(long) = arg.get_long() {
-                if long.starts_with(arg_filter) {
-                    let help = arg.get_help().map(|h| h.to_string()).unwrap_or_default();
+                let can_repeat = matches!(
+                    arg.get_action(),
+                    clap::ArgAction::Append | clap::ArgAction::Count
+                );
+                if (!seen_flags.contains(long) || can_repeat) && long.starts_with(arg_filter) {
+                    let help = arg
+                        .get_help()
+                        .map(|h| h.to_string().replace('\n', " ").trim().to_string())
+                        .unwrap_or_default();
                     completions.push(format!("--{}:{}", long, help));
                 }
             }
@@ -275,8 +292,18 @@ fn get_completions(cli: &Command, args: &[String]) -> Vec<String> {
     } else if let Some(arg_filter) = filter.strip_prefix('-') {
         for arg in current_cmd.get_arguments() {
             if let Some(short) = arg.get_short() {
-                if short.to_string().starts_with(arg_filter) {
-                    let help = arg.get_help().map(|h| h.to_string()).unwrap_or_default();
+                let short_str = short.to_string();
+                let can_repeat = matches!(
+                    arg.get_action(),
+                    clap::ArgAction::Append | clap::ArgAction::Count
+                );
+                if (!seen_flags.contains(&short_str) || can_repeat)
+                    && short_str.starts_with(arg_filter)
+                {
+                    let help = arg
+                        .get_help()
+                        .map(|h| h.to_string().replace('\n', " ").trim().to_string())
+                        .unwrap_or_default();
                     completions.push(format!("-{}:{}", short, help));
                 }
             }
@@ -288,10 +315,12 @@ fn get_completions(cli: &Command, args: &[String]) -> Vec<String> {
     for subcmd in current_cmd.get_subcommands() {
         if !subcmd.is_hide_set() {
             let name = subcmd.get_name();
-            if name.starts_with(filter) {
+            // Don't suggest the current filter if it's exactly the subcommand name
+            // (the shell usually handles this, but it doesn't hurt)
+            if name.starts_with(filter) && name != filter {
                 let about = subcmd
                     .get_about()
-                    .map(|a| a.to_string())
+                    .map(|a| a.to_string().replace('\n', " ").trim().to_string())
                     .unwrap_or_default();
                 completions.push(format!("{}:{}", name, about));
             }
@@ -374,7 +403,7 @@ mod tests {
                             .long("api-version")
                             .action(clap::ArgAction::Set),
                     )
-                    .arg(Arg::new("format").long("format").value_parser([
+                    .arg(Arg::new("format").long("format").short('F').value_parser([
                         PossibleValue::new("json").help("JSON format"),
                         PossibleValue::new("table").help("Table format"),
                     ])),
@@ -461,5 +490,20 @@ mod tests {
         let cli = test_cli();
         let completions = get_completions(&cli, &["drive".to_string(), "--f".to_string()]);
         assert!(completions.iter().any(|c| c.starts_with("--format:")));
+    }
+
+    #[test]
+    fn test_get_completions_skip_seen_flags() {
+        let cli = test_cli();
+        // Once --format is used, it should not be suggested again
+        let completions = get_completions(
+            &cli,
+            &["drive".to_string(), "--format".into(), "json".into(), "--".into()],
+        );
+        assert!(!completions.iter().any(|c| c.starts_with("--format:")));
+
+        // Once -F is used, it should not be suggested again
+        let completions = get_completions(&cli, &["drive".to_string(), "-F".into(), "json".into(), "-".into()]);
+        assert!(!completions.iter().any(|c| c.starts_with("-F:")));
     }
 }
