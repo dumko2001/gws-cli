@@ -149,11 +149,7 @@ fn get_completions(cli: &Command, args: &[String]) -> Vec<String> {
 
     // Walk the command tree using the provided args
     while let Some(arg) = it.next() {
-        if it.peek().is_none() {
-            // This is the last argument, we'll use it for filtering
-            last_arg = Some(arg);
-            break;
-        }
+        let is_last = it.peek().is_none();
 
         if arg.starts_with('-') && arg != "-" && arg != "--" {
             // This is a flag. We need to check if it takes a value and consume it
@@ -189,19 +185,39 @@ fn get_completions(cli: &Command, args: &[String]) -> Vec<String> {
                 // If it's a flag that takes a value and isn't in `--key=value` form,
                 // we need to consume the next argument as its value.
                 if def.get_action().takes_values() && !arg.contains('=') {
+                    if is_last {
+                        // The flag is the last argument and it expects a value.
+                        active_flag = Some(def);
+                        last_arg = Some("");
+                        break;
+                    }
                     if let Some(val) = it.next() {
                         if it.peek().is_none() {
                             // This value is the last arg, so we are completing it!
                             active_flag = Some(def);
-                            last_arg = Some(val);
+                            last_arg = Some(val.as_str());
                             break;
                         }
                     } else {
-                        // The flag was the last arg? (Should be handled by peek().is_none() above)
+                        // The flag was the last arg, but it expects a value.
+                        // We should complete for the value.
+                        active_flag = Some(def);
+                        last_arg = Some("");
+                        break;
                     }
                 }
             }
+            if is_last {
+                last_arg = Some(arg.as_str());
+                break;
+            }
             continue;
+        }
+
+        if is_last {
+            // This is the last argument, we'll use it for filtering
+            last_arg = Some(arg.as_str());
+            break;
         }
 
         if let Some(subcmd) = current_cmd.find_subcommand(arg) {
@@ -212,7 +228,7 @@ fn get_completions(cli: &Command, args: &[String]) -> Vec<String> {
         }
     }
 
-    let filter = last_arg.map(|s| s.as_str()).unwrap_or("");
+    let filter = last_arg.unwrap_or("");
 
     // If we are completing a flag value, try to suggest allowed values
     if let Some(flag) = active_flag {
@@ -415,6 +431,15 @@ mod tests {
             &["drive".to_string(), "--format".to_string(), "j".to_string()],
         );
         assert!(completions.iter().any(|c| c.starts_with("json:")));
+    }
+
+    #[test]
+    fn test_get_completions_flag_last_arg() {
+        let cli = test_cli();
+        // Input: gws drive --format -> should suggest json, table
+        let completions = get_completions(&cli, &["drive".to_string(), "--format".to_string()]);
+        assert!(completions.iter().any(|c| c.starts_with("json:")));
+        assert!(completions.iter().any(|c| c.starts_with("table:")));
     }
 
     #[test]
