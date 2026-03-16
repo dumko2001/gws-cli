@@ -7,7 +7,7 @@ def check_links():
     docsdir = Path("docs").resolve()
     
     # regex to find markdown links: [text](path)
-    link_regex = re.compile(r'\[.*?\]\(([^http].*?)\)')
+    link_regex = re.compile(r'\[.*?\]\((.*?)\)')
     
     broken_links = 0
     total_links = 0
@@ -15,11 +15,15 @@ def check_links():
     files_to_check = list(basedir.rglob("*.md")) + list(docsdir.rglob("*.md"))
     
     for filepath in files_to_check:
-        with open(filepath, 'r') as f:
+        with open(filepath, 'r', encoding='utf-8') as f:
             content = f.read()
             
         for match in link_regex.finditer(content):
             link_path = match.group(1).strip()
+            
+            # Skip HTTP(S) links
+            if link_path.startswith(('http://', 'https://')):
+                continue
             
             # Skip empty links, mailto:, etc
             if not link_path or link_path.startswith(('mailto:', 'tel:')):
