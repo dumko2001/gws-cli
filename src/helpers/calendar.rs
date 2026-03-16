@@ -466,7 +466,22 @@ fn build_insert_request(
 
     if matches.get_flag("meet") {
         let namespace = uuid::Uuid::NAMESPACE_DNS;
-        let seed_data = format!("{}:{}:{}", summary, start, end);
+
+        let mut seed_data = format!("{}:{}:{}", summary, start, end);
+        if let Some(loc) = location {
+            seed_data.push_str(&format!(":loc={}", loc));
+        }
+        if let Some(desc) = description {
+            seed_data.push_str(&format!(":desc={}", desc));
+        }
+        if let Some(atts) = matches.get_many::<String>("attendee") {
+            let mut atts_vec: Vec<_> = atts.collect();
+            atts_vec.sort();
+            for email in atts_vec {
+                seed_data.push_str(&format!(":att={}", email));
+            }
+        }
+
         let request_id = uuid::Uuid::new_v5(&namespace, seed_data.as_bytes()).to_string();
 
         body["conferenceData"] = json!({
