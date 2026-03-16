@@ -467,22 +467,24 @@ fn build_insert_request(
     if matches.get_flag("meet") {
         let namespace = uuid::Uuid::NAMESPACE_DNS;
 
-        let mut seed_data = format!("{}:{}:{}", summary, start, end);
-        if let Some(loc) = location {
-            seed_data.push_str(&format!(":loc={}", loc));
-        }
-        if let Some(desc) = description {
-            seed_data.push_str(&format!(":desc={}", desc));
-        }
-        if let Some(atts) = matches.get_many::<String>("attendee") {
-            let mut atts_vec: Vec<_> = atts.collect();
-            atts_vec.sort();
-            for email in atts_vec {
-                seed_data.push_str(&format!(":att={}", email));
-            }
-        }
+        let mut attendees: Vec<_> = matches
+            .get_many::<String>("attendee")
+            .map(|vals| vals.cloned().collect())
+            .unwrap_or_default();
+        attendees.sort();
 
-        let request_id = uuid::Uuid::new_v5(&namespace, seed_data.as_bytes()).to_string();
+        let seed_payload = json!({
+            "v": 1,
+            "summary": summary,
+            "start": start,
+            "end": end,
+            "location": location,
+            "description": description,
+            "attendees": attendees,
+        });
+
+        let seed_data = serde_json::to_vec(&seed_payload).unwrap_or_default();
+        let request_id = uuid::Uuid::new_v5(&namespace, &seed_data).to_string();
 
         body["conferenceData"] = json!({
             "createRequest": {
@@ -492,7 +494,6 @@ fn build_insert_request(
         });
         params["conferenceDataVersion"] = json!(1);
     }
-
     let body_str = body.to_string();
     let scopes: Vec<String> = insert_method.scopes.iter().map(|s| s.to_string()).collect();
 
@@ -610,6 +611,42 @@ mod tests {
             b2["conferenceData"]["createRequest"]["requestId"],
             "requestId should be deterministic for the same event details"
         );
+    }
+
+    #[test]
+    fn test_build_insert_request_with_meet_idempotency_robust() {
+        let doc = make_mock_doc();
+        
+        // Base case
+        let args_base = &[
+            "test", "--summary", "S", "--start", "2024-01-01T10:00:00Z", "--end", "2024-01-01T11:00:00Z",
+            "--meet", "--attendee", "a@b.com", "--attendee", "c@d.com"
+        ];
+        let (_, body_base, _) = build_insert_request(&make_matches_insert(args_base), &doc).unwrap();
+        let b_base: serde_json::Value = serde_json::from_str(&body_base).unwrap();
+        let id_base = b_base["conferenceData"]["createRequest"]["requestId"].as_str().unwrap();
+
+        // Same but different attendee order
+        let args_reordered = &[
+            "test", "--summary", "S", "--start", "2024-01-01T10:00:00Z", "--end", "2024-01-01T11:00:00Z",
+            "--meet", "--attendee", "c@d.com", "--attendee", "a@b.com"
+        ];
+        let (_, body_reordered, _) = build_insert_request(&make_matches_insert(args_reordered), &doc).unwrap();
+        let b_reordered: serde_json::Value = serde_json::from_str(&body_reordered).unwrap();
+        let id_reordered = b_reordered["conferenceData"]["createRequest"]["requestId"].as_str().unwrap();
+
+        assert_eq!(id_base, id_reordered, "Attendee order should not change requestId");
+
+        // Different summary -> different ID
+        let args_diff = &[
+            "test", "--summary", "Diff", "--start", "2024-01-01T10:00:00Z", "--end", "2024-01-01T11:00:00Z",
+            "--meet", "--attendee", "a@b.com", "--attendee", "c@d.com"
+        ];
+        let (_, body_diff, _) = build_insert_request(&make_matches_insert(args_diff), &doc).unwrap();
+        let b_diff: serde_json::Value = serde_json::from_str(&body_diff).unwrap();
+        let id_diff = b_diff["conferenceData"]["createRequest"]["requestId"].as_str().unwrap();
+
+        assert_ne!(id_base, id_diff, "Different summary should produce different requestId");
     }
 
     #[test]
