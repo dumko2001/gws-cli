@@ -85,32 +85,32 @@ pub async fn handle_skills_command(args: &[String]) -> Result<(), GwsError> {
     }
 
     // Search Personas
-    if let Ok(registry) = serde_yaml::from_str::<PersonaRegistry>(PERSONAS_YAML) {
-        for p in registry.personas {
-            if p.name.to_lowercase().contains(&query)
-                || p.title.to_lowercase().contains(&query)
-                || p.description.to_lowercase().contains(&query)
-            {
-                println!("[Persona] persona-{} - {}", p.name, p.title);
-                println!("  Description: {}", p.description);
-                println!("  Skill: skills/persona-{}/SKILL.md\n", p.name);
-                results += 1;
-            }
+    let persona_registry: PersonaRegistry = serde_yaml::from_str(PERSONAS_YAML)
+        .map_err(|e| GwsError::Validation(format!("Failed to parse personas.yaml: {e}")))?;
+    for p in persona_registry.personas {
+        if p.name.to_lowercase().contains(&query)
+            || p.title.to_lowercase().contains(&query)
+            || p.description.to_lowercase().contains(&query)
+        {
+            println!("[Persona] persona-{} - {}", p.name, p.title);
+            println!("  Description: {}", p.description);
+            println!("  Skill: skills/persona-{}/SKILL.md\n", p.name);
+            results += 1;
         }
     }
 
     // Search Recipes
-    if let Ok(registry) = serde_yaml::from_str::<RecipeRegistry>(RECIPES_YAML) {
-        for r in registry.recipes {
-            if r.name.to_lowercase().contains(&query)
-                || r.title.to_lowercase().contains(&query)
-                || r.description.to_lowercase().contains(&query)
-            {
-                println!("[Recipe] recipe-{} - {}", r.name, r.title);
-                println!("  Description: {}", r.description);
-                println!("  Skill: skills/recipe-{}/SKILL.md\n", r.name);
-                results += 1;
-            }
+    let recipe_registry: RecipeRegistry = serde_yaml::from_str(RECIPES_YAML)
+        .map_err(|e| GwsError::Validation(format!("Failed to parse recipes.yaml: {e}")))?;
+    for r in recipe_registry.recipes {
+        if r.name.to_lowercase().contains(&query)
+            || r.title.to_lowercase().contains(&query)
+            || r.description.to_lowercase().contains(&query)
+        {
+            println!("[Recipe] recipe-{} - {}", r.name, r.title);
+            println!("  Description: {}", r.description);
+            println!("  Skill: skills/recipe-{}/SKILL.md\n", r.name);
+            results += 1;
         }
     }
 

@@ -234,29 +234,31 @@ pub async fn handle_generate_skills(args: &[String]) -> Result<(), GwsError> {
         .as_ref()
         .is_none_or(|f| "persona".contains(f.as_str()) || "personas".contains(f.as_str()))
     {
-        if let Ok(registry) = serde_yaml::from_str::<PersonaRegistry>(PERSONAS_YAML) {
-            eprintln!(
-                "Generating skills for {} personas...",
-                registry.personas.len()
-            );
-            for persona in registry.personas {
-                let name = format!("persona-{}", persona.name);
-                let emit = match &filter {
-                    Some(f) => name.contains(f.as_str()),
-                    None => true,
-                };
-                if emit {
-                    let md = render_persona_skill(&persona);
-                    write_skill(output_path, &name, &md, false)?;
-                    index.push(SkillIndexEntry {
-                        name: name.clone(),
-                        description: truncate_desc(&persona.description),
-                        category: "persona".to_string(),
-                    });
-                }
+        let registry: PersonaRegistry = serde_yaml::from_str(PERSONAS_YAML).map_err(|e| {
+            GwsError::Validation(format!(
+                "Failed to parse personas.yaml during generation: {e}"
+            ))
+        })?;
+
+        eprintln!(
+            "Generating skills for {} personas...",
+            registry.personas.len()
+        );
+        for persona in registry.personas {
+            let name = format!("persona-{}", persona.name);
+            let emit = match &filter {
+                Some(f) => name.contains(f.as_str()),
+                None => true,
+            };
+            if emit {
+                let md = render_persona_skill(&persona);
+                write_skill(output_path, &name, &md, false)?;
+                index.push(SkillIndexEntry {
+                    name: name.clone(),
+                    description: truncate_desc(&persona.description),
+                    category: "persona".to_string(),
+                });
             }
-        } else {
-            eprintln!("WARNING: Failed to parse personas.yaml");
         }
     }
 
@@ -265,29 +267,31 @@ pub async fn handle_generate_skills(args: &[String]) -> Result<(), GwsError> {
         .as_ref()
         .is_none_or(|f| "recipe".contains(f.as_str()) || "recipes".contains(f.as_str()))
     {
-        if let Ok(registry) = serde_yaml::from_str::<RecipeRegistry>(RECIPES_YAML) {
-            eprintln!(
-                "Generating skills for {} recipes...",
-                registry.recipes.len()
-            );
-            for recipe in registry.recipes {
-                let name = format!("recipe-{}", recipe.name);
-                let emit = match &filter {
-                    Some(f) => name.contains(f.as_str()),
-                    None => true,
-                };
-                if emit {
-                    let md = render_recipe_skill(&recipe);
-                    write_skill(output_path, &name, &md, false)?;
-                    index.push(SkillIndexEntry {
-                        name: name.clone(),
-                        description: truncate_desc(&recipe.description),
-                        category: "recipe".to_string(),
-                    });
-                }
+        let registry: RecipeRegistry = serde_yaml::from_str(RECIPES_YAML).map_err(|e| {
+            GwsError::Validation(format!(
+                "Failed to parse recipes.yaml during generation: {e}"
+            ))
+        })?;
+
+        eprintln!(
+            "Generating skills for {} recipes...",
+            registry.recipes.len()
+        );
+        for recipe in registry.recipes {
+            let name = format!("recipe-{}", recipe.name);
+            let emit = match &filter {
+                Some(f) => name.contains(f.as_str()),
+                None => true,
+            };
+            if emit {
+                let md = render_recipe_skill(&recipe);
+                write_skill(output_path, &name, &md, false)?;
+                index.push(SkillIndexEntry {
+                    name: name.clone(),
+                    description: truncate_desc(&recipe.description),
+                    category: "recipe".to_string(),
+                });
             }
-        } else {
-            eprintln!("WARNING: Failed to parse recipes.yaml");
         }
     }
 
