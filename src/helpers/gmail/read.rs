@@ -69,7 +69,7 @@ pub(super) async fn handle_read(
         original
             .body_html
             .as_deref()
-            .filter(|s| !s.is_empty())
+            .filter(|s| !s.trim().is_empty())
             .unwrap_or(&original.body_text)
     } else {
         &original.body_text
