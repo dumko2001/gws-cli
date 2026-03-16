@@ -58,21 +58,28 @@ pub async fn handle_skills_command(args: &[String]) -> Result<(), GwsError> {
         ));
     }
 
-    let query = args[1..].join(" ").to_lowercase();
+    // Split into individual tokens so multi-word queries like "send email" match
+    // descriptions where the words appear separately (e.g. "Send an email").
+    let query_tokens: Vec<String> = args[1..].iter().map(|a| a.to_lowercase()).collect();
+    let query_display = query_tokens.join(" ");
 
-    println!("Searching for skills matching \"{}\"...\n", query);
+    println!("Searching for skills matching \"{}\"...\n", query_display);
 
     let mut results = 0;
 
+    // Returns true when every token in query_tokens appears somewhere in the combined fields.
+    let matches = |fields: &[&str]| -> bool {
+        let combined = fields.join(" ").to_lowercase();
+        query_tokens.iter().all(|t| combined.contains(t.as_str()))
+    };
+
     // Search Services
     for svc in services::SERVICES {
-        if svc.api_name.to_lowercase().contains(&query)
-            || svc.description.to_lowercase().contains(&query)
-            || svc
-                .aliases
-                .iter()
-                .any(|a| a.to_lowercase().contains(&query))
-        {
+        let fields: Vec<&str> = std::iter::once(svc.api_name)
+            .chain(std::iter::once(svc.description))
+            .chain(svc.aliases.iter().copied())
+            .collect();
+        if matches(&fields) {
             println!("[Service] gws-{} - {}", svc.aliases[0], svc.description);
             println!(
                 "  Reference: skills/references/gws-{}/SKILL.md\n",
@@ -99,9 +106,7 @@ pub async fn handle_skills_command(args: &[String]) -> Result<(), GwsError> {
                     let about = sub.get_about().map(|s| s.to_string()).unwrap_or_default();
                     let about_clean = about.strip_prefix("[Helper] ").unwrap_or(&about);
 
-                    if full_helper_name.to_lowercase().contains(&query)
-                        || about_clean.to_lowercase().contains(&query)
-                    {
+                    if matches(&[full_helper_name.as_str(), about_clean]) {
                         println!("[Helper] {} - {}", full_helper_name, about_clean);
                         println!(
                             "  Reference: skills/references/{}/SKILL.md\n",
@@ -118,10 +123,7 @@ pub async fn handle_skills_command(args: &[String]) -> Result<(), GwsError> {
     let persona_registry: PersonaRegistry = serde_yaml::from_str(PERSONAS_YAML)
         .map_err(|e| GwsError::Validation(format!("Failed to parse personas.yaml: {e}")))?;
     for p in persona_registry.personas {
-        if p.name.to_lowercase().contains(&query)
-            || p.title.to_lowercase().contains(&query)
-            || p.description.to_lowercase().contains(&query)
-        {
+        if matches(&[p.name.as_str(), p.title.as_str(), p.description.as_str()]) {
             println!("[Persona] persona-{} - {}", p.name, p.title);
             println!("  Description: {}", p.description);
             println!("  Skill: skills/persona-{}/SKILL.md\n", p.name);
@@ -133,10 +135,7 @@ pub async fn handle_skills_command(args: &[String]) -> Result<(), GwsError> {
     let recipe_registry: RecipeRegistry = serde_yaml::from_str(RECIPES_YAML)
         .map_err(|e| GwsError::Validation(format!("Failed to parse recipes.yaml: {e}")))?;
     for r in recipe_registry.recipes {
-        if r.name.to_lowercase().contains(&query)
-            || r.title.to_lowercase().contains(&query)
-            || r.description.to_lowercase().contains(&query)
-        {
+        if matches(&[r.name.as_str(), r.title.as_str(), r.description.as_str()]) {
             println!("[Recipe] recipe-{} - {}", r.name, r.title);
             println!("  Description: {}", r.description);
             println!("  Skill: skills/recipe-{}/SKILL.md\n", r.name);
