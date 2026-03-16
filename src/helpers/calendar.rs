@@ -473,15 +473,23 @@ fn build_insert_request(
             .unwrap_or_default();
         attendees.sort();
 
-        let seed_payload = json!({
-            "v": 1,
-            "summary": summary,
-            "start": start,
-            "end": end,
-            "location": location,
-            "description": description,
-            "attendees": attendees,
-        });
+        let seed_payload = {
+            let mut map = serde_json::Map::new();
+            map.insert("v".to_string(), json!(1));
+            map.insert("summary".to_string(), json!(summary));
+            map.insert("start".to_string(), json!(start));
+            map.insert("end".to_string(), json!(end));
+            if let Some(loc) = location {
+                map.insert("location".to_string(), json!(loc));
+            }
+            if let Some(desc) = description {
+                map.insert("description".to_string(), json!(desc));
+            }
+            if !attendees.is_empty() {
+                map.insert("attendees".to_string(), json!(attendees));
+            }
+            serde_json::Value::Object(map)
+        };
 
         let seed_data = serde_json::to_vec(&seed_payload).map_err(|e| {
             GwsError::Other(anyhow::anyhow!(
