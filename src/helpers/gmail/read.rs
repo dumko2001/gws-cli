@@ -13,6 +13,7 @@
 // limitations under the License.
 
 use super::*;
+use std::io::{self, Write};
 
 /// Handle the `+read` subcommand.
 pub(super) async fn handle_read(
@@ -40,24 +41,28 @@ pub(super) async fn handle_read(
     let show_headers = matches.get_flag("headers");
     let use_html = matches.get_flag("html");
 
+    let mut stdout = io::stdout().lock();
+
     if format == "json" {
-        println!(
+        writeln!(
+            stdout,
             "{}",
             serde_json::to_string_pretty(&original)
                 .map_err(|e| GwsError::Other(anyhow::anyhow!(e)))?
-        );
+        )
+        .map_err(|e| GwsError::Other(anyhow::anyhow!(e)))?;
         return Ok(());
     }
 
     if show_headers {
-        println!("From: {}", original.from);
-        println!("To: {}", original.to);
+        writeln!(stdout, "From: {}", original.from).map_err(|e| GwsError::Other(anyhow::anyhow!(e)))?;
+        writeln!(stdout, "To: {}", original.to).map_err(|e| GwsError::Other(anyhow::anyhow!(e)))?;
         if !original.cc.is_empty() {
-            println!("Cc: {}", original.cc);
+            writeln!(stdout, "Cc: {}", original.cc).map_err(|e| GwsError::Other(anyhow::anyhow!(e)))?;
         }
-        println!("Subject: {}", original.subject);
-        println!("Date: {}", original.date);
-        println!("---");
+        writeln!(stdout, "Subject: {}", original.subject).map_err(|e| GwsError::Other(anyhow::anyhow!(e)))?;
+        writeln!(stdout, "Date: {}", original.date).map_err(|e| GwsError::Other(anyhow::anyhow!(e)))?;
+        writeln!(stdout, "---").map_err(|e| GwsError::Other(anyhow::anyhow!(e)))?;
     }
 
     let body = if use_html {
@@ -70,7 +75,7 @@ pub(super) async fn handle_read(
         &original.body_text
     };
 
-    println!("{}", body);
+    writeln!(stdout, "{}", body).map_err(|e| GwsError::Other(anyhow::anyhow!(e)))?;
 
     Ok(())
 }
