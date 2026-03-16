@@ -19,7 +19,7 @@ def check_links():
             content = f.read()
             
         for match in link_regex.finditer(content):
-            link_path = match.group(1).strip()
+            link_path = match.group(1).strip().split(' ', 1)[0]
             
             # Skip HTTP(S) links
             if link_path.startswith(('http://', 'https://')):
