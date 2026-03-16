@@ -483,7 +483,11 @@ fn build_insert_request(
             "attendees": attendees,
         });
 
-        let seed_data = serde_json::to_vec(&seed_payload).unwrap_or_default();
+        let seed_data = serde_json::to_vec(&seed_payload).map_err(|e| {
+            GwsError::Other(anyhow::anyhow!(
+                "Failed to serialize seed payload for idempotency key: {e}"
+            ))
+        })?;
         let request_id = uuid::Uuid::new_v5(&namespace, &seed_data).to_string();
 
         body["conferenceData"] = json!({
