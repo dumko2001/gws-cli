@@ -29,13 +29,16 @@ _gws_complete() {{
     local completions
     completions=$(gws __complete "${{args[@]}}")
     
-    local filtered_completions=""
+    local -a suggestions
     while IFS= read -r line; do
-        # Extract the completion part (everything before the first colon)
-        filtered_completions+="${{line%%:*}} "
+        local name="${{line%%:*}}"
+        # Filter by current word
+        if [[ "$name" == "$word"* ]]; then
+            suggestions+=("$name")
+        fi
     done <<< "$completions"
     
-    COMPREPLY=( $(compgen -W "$filtered_completions" -- "$word") )
+    COMPREPLY=("${{suggestions[@]}}")
 }}
 complete -F _gws_complete gws
 "#
