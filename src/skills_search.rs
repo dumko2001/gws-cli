@@ -41,16 +41,9 @@ fn print_skills_help() {
 /// Entry point for `gws skills search <query>`.
 pub async fn handle_skills_command(args: &[String]) -> Result<(), GwsError> {
     if args.is_empty() || args[0] != "search" {
-        // Handle top-level help for `gws skills --help`
-        if args.first().map(|a| a.as_str()) == Some("--help")
-            || args.first().map(|a| a.as_str()) == Some("-h")
-        {
-            print_skills_help();
-            return Ok(());
-        }
-        return Err(GwsError::Validation(
-            "Usage: gws skills search <query>".to_string(),
-        ));
+        // `gws skills` or `gws skills --help` → show help (don't error on bare invocation)
+        print_skills_help();
+        return Ok(());
     }
 
     // Handle `gws skills search --help`
