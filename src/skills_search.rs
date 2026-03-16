@@ -15,35 +15,8 @@
 //! Search and discovery for agent skills.
 
 use crate::error::GwsError;
+use crate::registry::{PersonaRegistry, RecipeRegistry, PERSONAS_YAML, RECIPES_YAML};
 use crate::services;
-use serde::Deserialize;
-
-const PERSONAS_YAML: &str = include_str!("../registry/personas.yaml");
-const RECIPES_YAML: &str = include_str!("../registry/recipes.yaml");
-
-#[derive(Deserialize)]
-struct PersonaRegistry {
-    personas: Vec<PersonaEntry>,
-}
-
-#[derive(Deserialize)]
-struct PersonaEntry {
-    name: String,
-    title: String,
-    description: String,
-}
-
-#[derive(Deserialize)]
-struct RecipeRegistry {
-    recipes: Vec<RecipeEntry>,
-}
-
-#[derive(Deserialize)]
-struct RecipeEntry {
-    name: String,
-    title: String,
-    description: String,
-}
 
 /// Entry point for `gws skills search <query>`.
 pub async fn handle_skills_command(args: &[String]) -> Result<(), GwsError> {

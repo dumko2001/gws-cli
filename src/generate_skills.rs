@@ -19,12 +19,12 @@
 use crate::commands;
 use crate::discovery;
 use crate::error::GwsError;
+use crate::registry::{
+    PersonaEntry, PersonaRegistry, RecipeEntry, RecipeRegistry, PERSONAS_YAML, RECIPES_YAML,
+};
 use crate::services;
 use clap::Command;
 use std::path::Path;
-
-const PERSONAS_YAML: &str = include_str!("../registry/personas.yaml");
-const RECIPES_YAML: &str = include_str!("../registry/recipes.yaml");
 
 /// Methods blocked from skill generation.
 /// Format: (service_alias, resource, method).
@@ -36,39 +36,6 @@ const BLOCKED_METHODS: &[(&str, &str, &str)] = &[
     ("people", "people", "deleteContact"),
     ("people", "people", "batchDeleteContacts"),
 ];
-
-#[derive(serde::Deserialize)]
-struct PersonaRegistry {
-    personas: Vec<PersonaEntry>,
-}
-
-#[derive(serde::Deserialize)]
-struct PersonaEntry {
-    name: String,
-    title: String,
-    description: String,
-    services: Vec<String>,
-    workflows: Vec<String>,
-    instructions: Vec<String>,
-    #[serde(default)]
-    tips: Vec<String>,
-}
-
-#[derive(serde::Deserialize)]
-struct RecipeRegistry {
-    recipes: Vec<RecipeEntry>,
-}
-
-#[derive(serde::Deserialize)]
-struct RecipeEntry {
-    name: String,
-    title: String,
-    description: String,
-    category: String,
-    services: Vec<String>,
-    steps: Vec<String>,
-    caution: Option<String>,
-}
 
 struct SkillIndexEntry {
     name: String,
