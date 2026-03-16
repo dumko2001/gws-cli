@@ -53,16 +53,21 @@ pub(super) async fn handle_read(
     }
 
     if show_headers {
-        writeln!(stdout, "From: {}", original.from)
+        writeln!(stdout, "From: {}", sanitize_terminal_output(&original.from))
             .map_err(|e| GwsError::Other(anyhow::anyhow!(e)))?;
-        writeln!(stdout, "To: {}", original.to).map_err(|e| GwsError::Other(anyhow::anyhow!(e)))?;
+        writeln!(stdout, "To: {}", sanitize_terminal_output(&original.to))
+            .map_err(|e| GwsError::Other(anyhow::anyhow!(e)))?;
         if !original.cc.is_empty() {
-            writeln!(stdout, "Cc: {}", original.cc)
+            writeln!(stdout, "Cc: {}", sanitize_terminal_output(&original.cc))
                 .map_err(|e| GwsError::Other(anyhow::anyhow!(e)))?;
         }
-        writeln!(stdout, "Subject: {}", original.subject)
-            .map_err(|e| GwsError::Other(anyhow::anyhow!(e)))?;
-        writeln!(stdout, "Date: {}", original.date)
+        writeln!(
+            stdout,
+            "Subject: {}",
+            sanitize_terminal_output(&original.subject)
+        )
+        .map_err(|e| GwsError::Other(anyhow::anyhow!(e)))?;
+        writeln!(stdout, "Date: {}", sanitize_terminal_output(&original.date))
             .map_err(|e| GwsError::Other(anyhow::anyhow!(e)))?;
         writeln!(stdout, "---").map_err(|e| GwsError::Other(anyhow::anyhow!(e)))?;
     }
@@ -77,7 +82,36 @@ pub(super) async fn handle_read(
         &original.body_text
     };
 
-    writeln!(stdout, "{}", body).map_err(|e| GwsError::Other(anyhow::anyhow!(e)))?;
+    writeln!(stdout, "{}", sanitize_terminal_output(body))
+        .map_err(|e| GwsError::Other(anyhow::anyhow!(e)))?;
 
     Ok(())
+}
+
+/// Sanitizes a string for terminal output by filtering out control characters
+/// to prevent terminal injection attacks. Safe control characters like
+/// newline, carriage return, and tab are preserved.
+fn sanitize_terminal_output(s: &str) -> String {
+    s.chars()
+        .filter(|c| !c.is_control() || matches!(c, '\n' | '\r' | '\t'))
+        .collect()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_sanitize_terminal_output() {
+        let malicious = "Subject: \x1b]0;MALICIOUS\x07Hello\nWorld\r\t";
+        let sanitized = sanitize_terminal_output(malicious);
+        // ANSI escape sequences (control chars) should be removed
+        assert!(!sanitized.contains('\x1b'));
+        assert!(!sanitized.contains('\x07'));
+        // Whitespace and formatting should be preserved
+        assert!(sanitized.contains("Hello"));
+        assert!(sanitized.contains('\n'));
+        assert!(sanitized.contains('\r'));
+        assert!(sanitized.contains('\t'));
+    }
 }
