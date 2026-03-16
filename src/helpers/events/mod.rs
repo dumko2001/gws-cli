@@ -174,7 +174,7 @@ TIPS:
         &'a self,
         doc: &'a crate::discovery::RestDescription,
         matches: &'a ArgMatches,
-        _sanitize_config: &'a crate::helpers::modelarmor::SanitizeConfig,
+        _policy: &'a crate::helpers::modelarmor::ExecutionPolicy,
     ) -> Pin<Box<dyn Future<Output = Result<bool, GwsError>> + Send + 'a>> {
         Box::pin(async move {
             if let Some(sub_matches) = matches.subcommand_matches("+subscribe") {

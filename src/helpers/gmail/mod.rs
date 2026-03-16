@@ -14,7 +14,7 @@
 
 use super::Helper;
 pub mod forward;
-pub mod reply;
+mod reply;
 pub mod send;
 pub mod triage;
 pub mod watch;
@@ -31,6 +31,7 @@ pub(super) use crate::executor;
 pub(super) use anyhow::Context;
 pub(super) use base64::{engine::general_purpose::URL_SAFE, Engine as _};
 pub(super) use clap::{Arg, ArgAction, ArgMatches, Command};
+pub(super) 
 pub(super) use serde_json::{json, Value};
 use std::future::Future;
 use std::pin::Pin;
@@ -637,7 +638,16 @@ pub(super) async fn send_raw_email(
     raw_message: &str,
     thread_id: Option<&str>,
     existing_token: Option<&str>,
+    policy: &crate::helpers::modelarmor::ExecutionPolicy,
 ) -> Result<(), GwsError> {
+    // Gmail-specific safety policy: block sending if draft-only mode is active
+    if policy.draft_only && !matches.get_flag("dry-run") {
+        return Err(GwsError::Validation(
+            "Gmail send operation blocked by --draft-only policy. Use --dry-run for oversight."
+                .to_string(),
+        ));
+    }
+
     let body = build_raw_send_body(raw_message, thread_id);
     let body_str = body.to_string();
 
@@ -675,8 +685,7 @@ pub(super) async fn send_raw_email(
         None,
         matches.get_flag("dry-run"),
         &pagination,
-        None,
-        &crate::helpers::modelarmor::SanitizeMode::Warn,
+        policy,
         &crate::formatter::OutputFormat::default(),
         false,
     )
@@ -1006,6 +1015,7 @@ TIPS:
                 ),
         );
 
+
         cmd = cmd.subcommand(
             Command::new("+watch")
                 .about("[Helper] Watch for new emails and stream them as NDJSON")
@@ -1095,36 +1105,37 @@ TIPS:
         &'a self,
         doc: &'a crate::discovery::RestDescription,
         matches: &'a ArgMatches,
-        sanitize_config: &'a crate::helpers::modelarmor::SanitizeConfig,
+        policy: &'a crate::helpers::modelarmor::ExecutionPolicy,
     ) -> Pin<Box<dyn Future<Output = Result<bool, GwsError>> + Send + 'a>> {
         Box::pin(async move {
             if let Some(matches) = matches.subcommand_matches("+send") {
-                handle_send(doc, matches).await?;
+                handle_send(doc, matches, policy).await?;
                 return Ok(true);
             }
 
+
             if let Some(matches) = matches.subcommand_matches("+reply") {
-                handle_reply(doc, matches, false).await?;
+                handle_reply(doc, matches, false, policy).await?;
                 return Ok(true);
             }
 
             if let Some(matches) = matches.subcommand_matches("+reply-all") {
-                handle_reply(doc, matches, true).await?;
+                handle_reply(doc, matches, true, policy).await?;
                 return Ok(true);
             }
 
             if let Some(matches) = matches.subcommand_matches("+forward") {
-                handle_forward(doc, matches).await?;
+                handle_forward(doc, matches, policy).await?;
                 return Ok(true);
             }
 
             if let Some(matches) = matches.subcommand_matches("+triage") {
-                handle_triage(matches).await?;
+                handle_triage(doc, matches, policy).await?;
                 return Ok(true);
             }
 
             if let Some(matches) = matches.subcommand_matches("+watch") {
-                handle_watch(matches, sanitize_config).await?;
+                handle_watch(doc, matches, policy).await?;
                 return Ok(true);
             }
 

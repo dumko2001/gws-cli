@@ -19,6 +19,7 @@ pub(super) async fn handle_reply(
     doc: &crate::discovery::RestDescription,
     matches: &ArgMatches,
     reply_all: bool,
+    policy: &crate::helpers::modelarmor::ExecutionPolicy,
 ) -> Result<(), GwsError> {
     let config = parse_reply_args(matches)?;
     let dry_run = matches.get_flag("dry-run");
@@ -100,7 +101,7 @@ pub(super) async fn handle_reply(
     let raw = create_reply_raw_message(&envelope, &original);
 
     let auth_token = token.as_ref().map(|(t, _)| t.as_str());
-    super::send_raw_email(doc, matches, &raw, Some(&original.thread_id), auth_token).await
+    super::send_raw_email(doc, matches, &raw, Some(&original.thread_id), auth_token, policy).await
 }
 
 // --- Data structures ---

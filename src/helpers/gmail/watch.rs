@@ -6,8 +6,9 @@ const GMAIL_API_BASE: &str = "https://gmail.googleapis.com/gmail/v1";
 
 /// Handles the `+watch` command — Gmail push notifications via Pub/Sub.
 pub(super) async fn handle_watch(
+    _doc: &crate::discovery::RestDescription,
     matches: &ArgMatches,
-    sanitize_config: &crate::helpers::modelarmor::SanitizeConfig,
+    policy: &crate::helpers::modelarmor::ExecutionPolicy,
 ) -> Result<(), GwsError> {
     let config = parse_watch_args(matches)?;
 
@@ -205,7 +206,7 @@ pub(super) async fn handle_watch(
         client: &client,
         pubsub_token_provider: &pubsub_token_provider,
         gmail_token_provider: &gmail_token_provider,
-        sanitize_config,
+        policy,
         pubsub_api_base: PUBSUB_API_BASE,
         gmail_api_base: GMAIL_API_BASE,
     };
@@ -314,7 +315,7 @@ async fn watch_pull_loop(
                 *last_history_id,
                 &config.format,
                 config.output_dir.as_ref(),
-                runtime.sanitize_config,
+                runtime.policy,
                 runtime.gmail_api_base,
             )
             .await?;
@@ -399,7 +400,7 @@ async fn fetch_and_output_messages(
     start_history_id: u64,
     msg_format: &str,
     output_dir: Option<&std::path::PathBuf>,
-    sanitize_config: &crate::helpers::modelarmor::SanitizeConfig,
+    policy: &crate::helpers::modelarmor::ExecutionPolicy,
     gmail_api_base: &str,
 ) -> Result<(), GwsError> {
     let gmail_token = gmail_token_provider
@@ -436,14 +437,14 @@ async fn fetch_and_output_messages(
         if let Ok(resp) = msg_resp {
             if let Ok(mut full_msg) = resp.json::<Value>().await {
                 // Apply sanitization if configured
-                if let Some(ref template) = sanitize_config.template {
+                if let Some(ref template) = policy.template {
                     let text_to_check = serde_json::to_string(&full_msg).unwrap_or_default();
                     match crate::helpers::modelarmor::sanitize_text(template, &text_to_check).await
                     {
                         Ok(result) => {
                             if let Some(sanitized_msg) = apply_sanitization_result(
                                 full_msg,
-                                sanitize_config,
+                                policy,
                                 &result,
                                 &msg_id,
                             ) {
@@ -485,12 +486,12 @@ async fn fetch_and_output_messages(
 
 fn apply_sanitization_result(
     mut full_msg: Value,
-    sanitize_config: &crate::helpers::modelarmor::SanitizeConfig,
+    policy: &crate::helpers::modelarmor::ExecutionPolicy,
     result: &crate::helpers::modelarmor::SanitizationResult,
     msg_id: &str,
 ) -> Option<Value> {
     if result.filter_match_state == "MATCH_FOUND" {
-        match sanitize_config.mode {
+        match policy.mode {
             crate::helpers::modelarmor::SanitizeMode::Block => {
                 eprintln!(
                     "\x1b[31m[BLOCKED]\x1b[0m Message {msg_id} blocked by Model Armor (match found)"
@@ -551,7 +552,7 @@ struct WatchRuntime<'a> {
     client: &'a reqwest::Client,
     pubsub_token_provider: &'a dyn auth::AccessTokenProvider,
     gmail_token_provider: &'a dyn auth::AccessTokenProvider,
-    sanitize_config: &'a crate::helpers::modelarmor::SanitizeConfig,
+    policy: &'a crate::helpers::modelarmor::ExecutionPolicy,
     pubsub_api_base: &'a str,
     gmail_api_base: &'a str,
 }

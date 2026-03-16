@@ -3,6 +3,7 @@ use super::*;
 pub(super) async fn handle_send(
     doc: &crate::discovery::RestDescription,
     matches: &ArgMatches,
+    policy: &crate::helpers::modelarmor::ExecutionPolicy,
 ) -> Result<(), GwsError> {
     let config = parse_send_args(matches);
 
@@ -17,7 +18,7 @@ pub(super) async fn handle_send(
     }
     .build(&config.body);
 
-    super::send_raw_email(doc, matches, &raw, None, None).await
+    super::send_raw_email(doc, matches, &raw, None, None, policy).await
 }
 
 pub(super) struct SendConfig {

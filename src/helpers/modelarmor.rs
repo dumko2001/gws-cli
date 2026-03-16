@@ -46,21 +46,25 @@ pub enum SanitizeMode {
     Block,
 }
 
-/// Configuration for Model Armor sanitization, threaded through the CLI.
+/// Configuration for execution policies, including Model Armor sanitization
+/// and Gmail draft-only mode.
 #[derive(Debug, Clone)]
-pub struct SanitizeConfig {
+pub struct ExecutionPolicy {
     pub template: Option<String>,
     pub mode: SanitizeMode,
+    pub draft_only: bool,
 }
 
-impl Default for SanitizeConfig {
-    /// Provides default values for `SanitizeConfig`.
+impl Default for ExecutionPolicy {
+    /// Provides default values for `ExecutionPolicy`.
     ///
-    /// By default, no template is set (sanitization disabled) and the mode is `Warn`.
+    /// By default, no template is set (sanitization disabled), the mode is `Warn`,
+    /// and `draft_only` is false.
     fn default() -> Self {
         Self {
             template: None,
             mode: SanitizeMode::Warn,
+            draft_only: false,
         }
     }
 }
@@ -223,7 +227,7 @@ TIPS:
         &'a self,
         _doc: &'a RestDescription,
         matches: &'a ArgMatches,
-        _sanitize_config: &'a SanitizeConfig,
+        _policy: &'a ExecutionPolicy,
     ) -> Pin<Box<dyn Future<Output = Result<bool, GwsError>> + Send + 'a>> {
         Box::pin(async move {
             if let Some(sub) = matches.subcommand_matches("+sanitize-prompt") {

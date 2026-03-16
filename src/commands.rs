@@ -34,6 +34,15 @@ pub fn build_cli(doc: &RestDescription) -> Command {
                 .global(true),
         )
         .arg(
+            clap::Arg::new("draft-only")
+                .long("draft-only")
+                .help("Gmail draft-only mode: block sending and strictly allow only draft creation/updates. Also reads GOOGLE_WORKSPACE_GMAIL_DRAFT_ONLY env var.")
+                .action(clap::ArgAction::SetTrue)
+                .env("GOOGLE_WORKSPACE_GMAIL_DRAFT_ONLY")
+                .global(true),
+        )
+
+        .arg(
             clap::Arg::new("dry-run")
                 .long("dry-run")
                 .help("Validate the request locally without sending it to the API")

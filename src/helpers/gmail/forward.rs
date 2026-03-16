@@ -18,6 +18,7 @@ use super::*;
 pub(super) async fn handle_forward(
     doc: &crate::discovery::RestDescription,
     matches: &ArgMatches,
+    policy: &crate::helpers::modelarmor::ExecutionPolicy,
 ) -> Result<(), GwsError> {
     let config = parse_forward_args(matches);
     let dry_run = matches.get_flag("dry-run");
@@ -54,6 +55,7 @@ pub(super) async fn handle_forward(
         &raw,
         Some(&original.thread_id),
         token.as_deref(),
+        policy,
     )
     .await
 }

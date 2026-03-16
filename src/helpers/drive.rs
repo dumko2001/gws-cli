@@ -70,7 +70,7 @@ TIPS:
         &'a self,
         doc: &'a crate::discovery::RestDescription,
         matches: &'a ArgMatches,
-        _sanitize_config: &'a crate::helpers::modelarmor::SanitizeConfig,
+        _policy: &'a crate::helpers::modelarmor::ExecutionPolicy,
     ) -> Pin<Box<dyn Future<Output = Result<bool, GwsError>> + Send + 'a>> {
         Box::pin(async move {
             if let Some(matches) = matches.subcommand_matches("+upload") {
@@ -113,8 +113,7 @@ TIPS:
                     None,
                     matches.get_flag("dry-run"),
                     &executor::PaginationConfig::default(),
-                    None,
-                    &crate::helpers::modelarmor::SanitizeMode::Warn,
+                    _policy,
                     &crate::formatter::OutputFormat::default(),
                     false,
                 )

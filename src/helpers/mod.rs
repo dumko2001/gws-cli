@@ -45,7 +45,7 @@ pub trait Helper: Send + Sync {
         &'a self,
         doc: &'a crate::discovery::RestDescription,
         matches: &'a ArgMatches,
-        sanitize_config: &'a modelarmor::SanitizeConfig,
+        policy: &'a modelarmor::ExecutionPolicy,
     ) -> Pin<Box<dyn Future<Output = Result<bool, GwsError>> + Send + 'a>>;
 
     /// If true, only helper commands are shown (discovery-generated commands are suppressed).

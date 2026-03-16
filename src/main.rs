@@ -197,17 +197,45 @@ async fn run() -> Result<(), GwsError> {
         .map(|v| helpers::modelarmor::SanitizeMode::from_str(&v))
         .unwrap_or(helpers::modelarmor::SanitizeMode::Warn);
 
-    let sanitize_config = parse_sanitize_config(sanitize_template, &sanitize_mode)?;
+    let draft_only = matches.get_flag("draft-only");
+
+    let policy = helpers::modelarmor::ExecutionPolicy {
+        template: sanitize_template,
+        mode: sanitize_mode,
+        draft_only,
+    };
 
     // Check if a helper wants to handle this command
     if let Some(helper) = helpers::get_helper(&doc.name) {
-        if helper.handle(&doc, &matches, &sanitize_config).await? {
+        if helper.handle(&doc, &matches, &policy).await? {
             return Ok(());
         }
     }
 
     // Walk the subcommand tree to find the target method
-    let (method, matched_args) = resolve_method_from_matches(&doc, &matches)?;
+    let (method, matched_args, method_path) = resolve_method_from_matches(&doc, &matches)?;
+
+    // Gmail-specific safety policy: block sending if draft-only mode is active.
+    // We check this here to trigger BEFORE authentication for raw commands.
+    let dry_run = matched_args.get_flag("dry-run");
+    if draft_only && !dry_run && api_name == "gmail" {
+        let is_send = if let Some(ref id) = method.id {
+            id == "gmail.users.messages.send" || id == "gmail.users.drafts.send"
+        } else {
+            // Fallback to Discovery path if ID is missing (suggested by previous review for robustness)
+            method_path.len() == 3
+                && method_path[0] == "users"
+                && (method_path[1] == "messages" || method_path[1] == "drafts")
+                && method_path[2] == "send"
+        };
+
+        if is_send {
+            return Err(GwsError::Validation(
+                "Gmail send operation blocked by --draft-only policy. Use --dry-run for oversight."
+                    .to_string(),
+            ));
+        }
+    }
 
     let params_json = matched_args.get_one::<String>("params").map(|s| s.as_str());
     let body_json = matched_args
@@ -242,19 +270,15 @@ async fn run() -> Result<(), GwsError> {
         Ok(t) => (Some(t), executor::AuthMethod::OAuth),
         Err(e) => {
             // If credentials were found but failed (e.g. decryption error, invalid token),
-            // propagate the error instead of silently falling back to unauthenticated.
-            // Only fall back to None if no credentials exist at all.
-            let err_msg = format!("{e:#}");
-            // NB: matches the bail!() message in auth::load_credentials_inner
-            if err_msg.starts_with("No credentials found") {
-                (None, executor::AuthMethod::None)
-            } else {
-                return Err(GwsError::Auth(format!("Authentication failed: {err_msg}")));
+            // and we're not in dry-run mode, we should fail for real.
+            // If dry-run is on, we'll try to proceed without auth.
+            if !dry_run {
+                return Err(GwsError::Auth(format!("Authentication failed: {e}")));
             }
+            (None, executor::AuthMethod::None)
         }
     };
 
-    // Execute
     executor::execute_method(
         &doc,
         method,
@@ -267,8 +291,7 @@ async fn run() -> Result<(), GwsError> {
         upload_content_type,
         dry_run,
         &pagination,
-        sanitize_config.template.as_deref(),
-        &sanitize_config.mode,
+        &policy,
         &output_format,
         false,
     )
@@ -347,27 +370,18 @@ pub fn filter_args_for_subcommand(args: &[String], service_name: &str) -> Vec<St
     sub_args
 }
 
-fn parse_sanitize_config(
-    template: Option<String>,
-    mode: &helpers::modelarmor::SanitizeMode,
-) -> Result<helpers::modelarmor::SanitizeConfig, GwsError> {
-    Ok(helpers::modelarmor::SanitizeConfig {
-        template,
-        mode: mode.clone(),
-    })
-}
 
 /// Recursively walks clap ArgMatches to find the leaf method and its matches.
 fn resolve_method_from_matches<'a>(
     doc: &'a discovery::RestDescription,
     matches: &'a clap::ArgMatches,
-) -> Result<(&'a discovery::RestMethod, &'a clap::ArgMatches), GwsError> {
+) -> Result<(&'a discovery::RestMethod, &'a clap::ArgMatches, Vec<String>), GwsError> {
     // Walk the subcommand chain
-    let mut path: Vec<&str> = Vec::new();
+    let mut path: Vec<String> = Vec::new();
     let mut current_matches = matches;
 
     while let Some((sub_name, sub_matches)) = current_matches.subcommand() {
-        path.push(sub_name);
+        path.push(sub_name.to_string());
         current_matches = sub_matches;
     }
 
@@ -379,7 +393,7 @@ fn resolve_method_from_matches<'a>(
 
     // path looks like ["files", "list"] or ["files", "permissions", "list"]
     // Walk the Discovery Document resources to find the method
-    let resource_name = path[0];
+    let resource_name = &path[0];
     let resource = doc
         .resources
         .get(resource_name)
@@ -388,7 +402,7 @@ fn resolve_method_from_matches<'a>(
     let mut current_resource = resource;
 
     // Navigate sub-resources (everything except the last element, which is the method)
-    for &name in &path[1..path.len() - 1] {
+    for name in &path[1..path.len() - 1] {
         // Check if this is a sub-resource
         if let Some(sub) = current_resource.resources.get(name) {
             current_resource = sub;
@@ -400,11 +414,11 @@ fn resolve_method_from_matches<'a>(
     }
 
     // The last element is the method name
-    let method_name = path[path.len() - 1];
+    let method_name = &path[path.len() - 1];
 
     // Check if this is a method on the current resource
     if let Some(method) = current_resource.methods.get(method_name) {
-        return Ok((method, current_matches));
+        return Ok((method, current_matches, path));
     }
 
     // Maybe it's a resource that has methods — need one more subcommand
@@ -562,24 +576,6 @@ mod tests {
     }
 
     #[test]
-    fn test_parse_sanitize_config_valid() {
-        let config = parse_sanitize_config(
-            Some("tpl".to_string()),
-            &helpers::modelarmor::SanitizeMode::Warn,
-        )
-        .unwrap();
-        assert_eq!(config.template.as_deref(), Some("tpl"));
-    }
-
-    #[test]
-    fn test_parse_sanitize_config_no_template() {
-        let config =
-            parse_sanitize_config(None, &helpers::modelarmor::SanitizeMode::Block).unwrap();
-        assert!(config.template.is_none());
-        assert_eq!(config.mode, helpers::modelarmor::SanitizeMode::Block);
-    }
-
-    #[test]
     fn test_is_version_flag() {
         assert!(is_version_flag("--version"));
         assert!(is_version_flag("-V"));
@@ -622,8 +618,9 @@ mod tests {
             .subcommand(clap::Command::new("files").subcommand(clap::Command::new("list")));
 
         let matches = cmd.get_matches_from(vec!["gws", "files", "list"]);
-        let (method, _) = resolve_method_from_matches(&doc, &matches).unwrap();
+        let (method, _, method_path) = resolve_method_from_matches(&doc, &matches).unwrap();
         assert_eq!(method.id.as_deref(), Some("drive.files.list"));
+        assert_eq!(method_path, vec!["files", "list"]);
     }
 
     #[test]
@@ -655,8 +652,9 @@ mod tests {
             ));
 
         let matches = cmd.get_matches_from(vec!["gws", "files", "permissions", "get"]);
-        let (method, _) = resolve_method_from_matches(&doc, &matches).unwrap();
+        let (method, _, method_path) = resolve_method_from_matches(&doc, &matches).unwrap();
         assert_eq!(method.id.as_deref(), Some("drive.files.permissions.get"));
+        assert_eq!(method_path, vec!["files", "permissions", "get"]);
     }
 
     #[test]

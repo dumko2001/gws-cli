@@ -217,8 +217,7 @@ async fn build_http_request(
 async fn handle_json_response(
     body_text: &str,
     pagination: &PaginationConfig,
-    sanitize_template: Option<&str>,
-    sanitize_mode: &crate::helpers::modelarmor::SanitizeMode,
+    policy: &crate::helpers::modelarmor::ExecutionPolicy,
     output_format: &crate::formatter::OutputFormat,
     pages_fetched: &mut u32,
     page_token: &mut Option<String>,
@@ -229,7 +228,7 @@ async fn handle_json_response(
         *pages_fetched += 1;
 
         // Run Model Armor sanitization if --sanitize is enabled
-        if let Some(template) = sanitize_template {
+        if let Some(ref template) = policy.template {
             let text_to_check = serde_json::to_string(&json_val).unwrap_or_default();
             match crate::helpers::modelarmor::sanitize_text(template, &text_to_check).await {
                 Ok(result) => {
@@ -238,7 +237,7 @@ async fn handle_json_response(
                         eprintln!("⚠️  Model Armor: prompt injection detected (filterMatchState: MATCH_FOUND)");
                     }
 
-                    if is_match && *sanitize_mode == crate::helpers::modelarmor::SanitizeMode::Block
+                    if is_match && policy.mode == crate::helpers::modelarmor::SanitizeMode::Block
                     {
                         let blocked = serde_json::json!({
                             "error": "Content blocked by Model Armor",
@@ -377,12 +376,26 @@ pub async fn execute_method(
     upload_content_type: Option<&str>,
     dry_run: bool,
     pagination: &PaginationConfig,
-    sanitize_template: Option<&str>,
-    sanitize_mode: &crate::helpers::modelarmor::SanitizeMode,
+    policy: &crate::helpers::modelarmor::ExecutionPolicy,
     output_format: &crate::formatter::OutputFormat,
     capture_output: bool,
 ) -> Result<Option<Value>, GwsError> {
     let input = parse_and_validate_inputs(doc, method, params_json, body_json, upload_path)?;
+
+    // Gmail-specific safety policy: block sending if draft-only mode is active
+    if policy.draft_only && !dry_run && doc.name == "gmail" {
+        let is_send = if let Some(ref id) = method.id {
+            id == "gmail.users.messages.send" || id == "gmail.users.drafts.send"
+        } else {
+            // Fallback to Discovery path if ID is missing.
+            // Standard Gmail send path: users/{userId}/messages/send
+            method.path.contains("messages/send") || method.path.contains("drafts/send")
+        };
+
+        if is_send {
+            return Err(GwsError::Validation("Gmail draft-only mode is active. Sending mail is blocked (preparing a draft is still allowed).".to_string()));
+        }
+    }
 
     if dry_run {
         let dry_run_info = json!({
@@ -470,8 +483,7 @@ pub async fn execute_method(
             let should_continue = handle_json_response(
                 &body_text,
                 pagination,
-                sanitize_template,
-                sanitize_mode,
+                policy,
                 output_format,
                 &mut pages_fetched,
                 &mut page_token,

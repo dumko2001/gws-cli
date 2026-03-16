@@ -21,7 +21,11 @@
 use super::*;
 
 /// Handle the `+triage` subcommand.
-pub async fn handle_triage(matches: &ArgMatches) -> Result<(), GwsError> {
+pub async fn handle_triage(
+    _doc: &crate::discovery::RestDescription,
+    matches: &ArgMatches,
+    _policy: &crate::helpers::modelarmor::ExecutionPolicy,
+) -> Result<(), GwsError> {
     let max: u32 = matches
         .get_one::<String>("max")
         .and_then(|s| s.parse().ok())

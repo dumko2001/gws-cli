@@ -63,7 +63,7 @@ TIPS:
         &'a self,
         doc: &'a crate::discovery::RestDescription,
         matches: &'a ArgMatches,
-        _sanitize_config: &'a crate::helpers::modelarmor::SanitizeConfig,
+        _policy: &'a crate::helpers::modelarmor::ExecutionPolicy,
     ) -> Pin<Box<dyn Future<Output = Result<bool, GwsError>> + Send + 'a>> {
         // We use `Box::pin` to create a pinned future on the heap.
         // This is necessary because the `Helper` trait returns a generic `Future`,
@@ -112,8 +112,7 @@ TIPS:
                     None,
                     matches.get_flag("dry-run"),
                     &pagination,
-                    None,
-                    &crate::helpers::modelarmor::SanitizeMode::Warn,
+                    _policy,
                     &crate::formatter::OutputFormat::default(),
                     false,
                 )
