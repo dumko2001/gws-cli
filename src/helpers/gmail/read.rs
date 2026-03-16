@@ -42,34 +42,30 @@ pub(super) async fn handle_read(
     let mut stdout = io::stdout().lock();
 
     if format == "json" {
-        writeln!(
-            stdout,
-            "{}",
-            serde_json::to_string_pretty(&original)
-                .map_err(|e| GwsError::Other(anyhow::anyhow!(e)))?
-        )
-        .map_err(|e| GwsError::Other(anyhow::anyhow!(e)))?;
+        let json_output = serde_json::to_string_pretty(&original)
+            .context("Failed to serialize message to JSON")?;
+        writeln!(stdout, "{}", json_output).context("Failed to write JSON output")?;
         return Ok(());
     }
 
     if show_headers {
         writeln!(stdout, "From: {}", sanitize_terminal_output(&original.from))
-            .map_err(|e| GwsError::Other(anyhow::anyhow!(e)))?;
+            .context("Failed to write 'From' header")?;
         writeln!(stdout, "To: {}", sanitize_terminal_output(&original.to))
-            .map_err(|e| GwsError::Other(anyhow::anyhow!(e)))?;
+            .context("Failed to write 'To' header")?;
         if !original.cc.is_empty() {
             writeln!(stdout, "Cc: {}", sanitize_terminal_output(&original.cc))
-                .map_err(|e| GwsError::Other(anyhow::anyhow!(e)))?;
+                .context("Failed to write 'Cc' header")?;
         }
         writeln!(
             stdout,
             "Subject: {}",
             sanitize_terminal_output(&original.subject)
         )
-        .map_err(|e| GwsError::Other(anyhow::anyhow!(e)))?;
+        .context("Failed to write 'Subject' header")?;
         writeln!(stdout, "Date: {}", sanitize_terminal_output(&original.date))
-            .map_err(|e| GwsError::Other(anyhow::anyhow!(e)))?;
-        writeln!(stdout, "---").map_err(|e| GwsError::Other(anyhow::anyhow!(e)))?;
+            .context("Failed to write 'Date' header")?;
+        writeln!(stdout, "---").context("Failed to write header separator")?;
     }
 
     let body = if use_html {
@@ -83,7 +79,7 @@ pub(super) async fn handle_read(
     };
 
     writeln!(stdout, "{}", sanitize_terminal_output(body))
-        .map_err(|e| GwsError::Other(anyhow::anyhow!(e)))?;
+        .context("Failed to write message body")?;
 
     Ok(())
 }
