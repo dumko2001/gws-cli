@@ -31,6 +31,7 @@ _gws_complete() {{
     
     local filtered_completions=""
     while IFS= read -r line; do
+        # Extract the completion part (everything before the first colon)
         filtered_completions+="${{line%%:*}} "
     done <<< "$completions"
     
@@ -71,8 +72,8 @@ function _gws_complete
     set -l cmd (commandline -opc)
     set -e cmd[1] # remove 'gws'
     
-    # Fish expects 'name\tDescription'
-    gws __complete $cmd | string replace -r ':(.*)' '\t$1'
+    # Fish expects 'name\tDescription'. Replace only the first colon.
+    gws __complete $cmd | string replace -r '^([^:]+):(.*)' '$1\t$2'
 end
 
 complete -c gws -f -a "(_gws_complete)"
@@ -82,11 +83,21 @@ complete -c gws -f -a "(_gws_complete)"
         "powershell" => {
             println!(
                 r#"
-Register-ArgumentCompleter -CommandName gws -ScriptBlock {{
-    param($commandName, $wordToComplete, $cursorPosition)
-    $args = $wordToComplete.Split(" ")
-    gws __complete $args | ForEach-Object {{
-        $parts = $_.Split(":")
+Register-ArgumentCompleter -NativeCommandName gws -ScriptBlock {{
+    param($wordToComplete, $commandAst, $cursorPosition)
+
+    # Get arguments from the AST, skipping the command itself ('gws').
+    $arguments = $commandAst.CommandElements | Select-Object -Skip 1 | ForEach-Object {{ $_.Extent.Text }}
+
+    # If the last character on the command line is a space, it means we are completing a new, empty argument.
+    if ($commandAst.Extent.Text.EndsWith(" ")) {{
+        $arguments += ""
+    }}
+
+    # Pass arguments to the completion command.
+    gws __complete $arguments | ForEach-Object {{
+        # Split only on the first colon to keep the rest of the description intact.
+        $parts = $_.Split(":", 2)
         $name = $parts[0]
         $desc = if ($parts.Length -gt 1) {{ $parts[1] }} else {{ "" }}
         [System.Management.Automation.CompletionResult]::new($name, $name, 'ParameterValue', $desc)
@@ -102,7 +113,7 @@ set edit:completion:arg-completer[gws] = {{ |@args|
     # remove 'gws'
     set args = $args[1..]
     gws __complete $@args | each {{ |line|
-        local parts = [(str:split : $line)]
+        local parts = [(str:split : $line &max=2)]
         local name = $parts[0]
         local desc = ''
         if (> (count $parts) 1) {{
