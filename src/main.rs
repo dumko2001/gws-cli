@@ -23,6 +23,7 @@ mod auth;
 pub(crate) mod auth_commands;
 mod client;
 mod commands;
+mod completion;
 pub(crate) mod credential_store;
 mod discovery;
 mod error;
@@ -129,6 +130,29 @@ async fn run() -> Result<(), GwsError> {
     if first_arg == "generate-skills" {
         let gen_args: Vec<String> = args.iter().skip(2).cloned().collect();
         return generate_skills::handle_generate_skills(&gen_args).await;
+    }
+
+    // Handle the `completion` command
+    if first_arg == "completion" {
+        let cli = build_static_cli();
+        match cli.try_get_matches_from(&args) {
+            Ok(matches) => {
+                if let Some(("completion", sub_matches)) = matches.subcommand() {
+                    let shell = sub_matches.get_one::<String>("shell").unwrap();
+                    return completion::print_bridge_script(shell);
+                }
+                unreachable!("Clap parsing succeeded for 'completion' but subcommand not found.");
+            }
+            Err(e) => {
+                e.exit();
+            }
+        }
+    }
+
+    // Handle the hidden `__complete` command for dynamic shell completion
+    if first_arg == "__complete" {
+        let complete_args: Vec<String> = args.iter().skip(2).cloned().collect();
+        return completion::handle_complete_command(complete_args, build_static_cli).await;
     }
 
     // Handle the `auth` command
@@ -412,6 +436,65 @@ fn resolve_method_from_matches<'a>(
         "Method '{method_name}' not found on resource. Available methods: {:?}",
         current_resource.methods.keys().collect::<Vec<_>>()
     )))
+}
+
+fn build_static_cli() -> clap::Command {
+    use clap::{Arg, Command};
+
+    let mut cmd = Command::new("gws")
+        .version(env!("CARGO_PKG_VERSION"))
+        .about("Google Workspace CLI")
+        .subcommand(
+            Command::new("auth")
+                .about("Manage authentication")
+                .subcommand(Command::new("login").about("Log in and save credentials"))
+                .subcommand(Command::new("logout").about("Log out and clear credentials"))
+                .subcommand(Command::new("setup").about("Run guided setup for GCP project"))
+                .subcommand(Command::new("status").about("Show current auth status"))
+                .subcommand(Command::new("export").about("Export credentials to stdout")),
+        )
+        .subcommand(
+            Command::new("schema")
+                .about("Introspect API method schemas")
+                .arg(
+                    Arg::new("path")
+                        .required(true)
+                        .help("API path (e.g. drive.files.list)"),
+                )
+                .arg(
+                    Arg::new("resolve-refs")
+                        .long("resolve-refs")
+                        .action(clap::ArgAction::SetTrue),
+                ),
+        )
+        .subcommand(
+            Command::new("generate-skills")
+                .about("Generate SKILL.md files for AI agents")
+                .arg(Arg::new("output-dir").long("output-dir").num_args(1)),
+        )
+        .subcommand(
+            Command::new("completion")
+                .about("Generate shell completion scripts")
+                .arg(Arg::new("shell").required(true).value_parser([
+                    "bash",
+                    "zsh",
+                    "fish",
+                    "powershell",
+                    "elvish",
+                ])),
+        );
+
+    // Add service aliases as subcommands so they show up in top-level completion
+    for entry in services::SERVICES {
+        for alias in entry.aliases {
+            if cmd.get_subcommands().any(|s| s.get_name() == *alias) {
+                continue;
+            }
+            cmd = cmd.subcommand(Command::new(*alias).about(entry.description));
+        }
+    }
+
+    cmd
 }
 
 fn print_usage() {
