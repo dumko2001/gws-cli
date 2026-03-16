@@ -21,6 +21,64 @@ use crate::registry::{PersonaRegistry, RecipeRegistry, PERSONAS_YAML, RECIPES_YA
 use crate::services;
 use clap::Command;
 
+/// Maps common natural-language terms to the canonical field values used in skill metadata.
+///
+/// When a user searches for "email", this table expands the token to also include "gmail",
+/// so `gws skills search email` finds the Gmail service even though "email" does not appear
+/// literally in its `api_name` or `aliases`. Each entry is `(user_term, canonical_expansion)`.
+///
+/// Expansions are additive — the original token is always kept — so an exact match on the
+/// canonical name still works even without a synonym entry.
+const SYNONYMS: &[(&str, &str)] = &[
+    // Product / service synonyms
+    ("email", "gmail"),
+    ("mail", "gmail"),
+    ("inbox", "gmail"),
+    ("spreadsheet", "sheets"),
+    ("excel", "sheets"),
+    ("sheet", "sheets"),
+    ("schedule", "calendar"),
+    ("meeting", "calendar"),
+    ("event", "calendar"),
+    ("document", "docs"),
+    ("word", "docs"),
+    ("doc", "docs"),
+    ("presentation", "slides"),
+    ("powerpoint", "slides"),
+    ("deck", "slides"),
+    ("storage", "drive"),
+    ("file", "drive"),
+    ("folder", "drive"),
+    ("note", "keep"),
+    ("task", "tasks"),
+    ("todo", "tasks"),
+    ("contact", "people"),
+    ("address", "people"),
+    ("video", "meet"),
+    ("conference", "meet"),
+    ("survey", "forms"),
+    ("course", "classroom"),
+    ("audit", "admin-reports"),
+    ("log", "admin-reports"),
+    ("safety", "modelarmor"),
+    ("automation", "workflow"),
+];
+
+/// Expands each query token via the synonym table, returning the original tokens plus
+/// any canonical expansions. Duplicates are deduplicated. The expanded set is used so
+/// that searching "email" also matches fields containing "gmail".
+pub(crate) fn expand_tokens(tokens: &[String]) -> Vec<String> {
+    let mut expanded: Vec<String> = tokens.to_vec();
+    for token in tokens {
+        for (term, canonical) in SYNONYMS {
+            if token == term && !expanded.iter().any(|e| e == canonical) {
+                expanded.push(canonical.to_string());
+            }
+        }
+    }
+    expanded
+}
+
 fn print_skills_help() {
     println!("USAGE:");
     println!("    gws skills search <query>");
@@ -28,6 +86,7 @@ fn print_skills_help() {
     println!("DESCRIPTION:");
     println!("    Search for agent skills by name or description.");
     println!("    Searches across services, helpers, personas, and recipes.");
+    println!("    Common synonyms are expanded automatically (e.g. \"email\" finds Gmail).");
     println!();
     println!("ARGUMENTS:");
     println!("    <query>    Keywords to search for (multi-word queries are supported)");
@@ -36,6 +95,7 @@ fn print_skills_help() {
     println!("    gws skills search email");
     println!("    gws skills search \"send email\"");
     println!("    gws skills search upload file");
+    println!("    gws skills search spreadsheet");
 }
 
 /// Entry point for `gws skills search <query>`.
@@ -60,17 +120,28 @@ pub async fn handle_skills_command(args: &[String]) -> Result<(), GwsError> {
 
     // Split into individual tokens so multi-word queries like "send email" match
     // descriptions where the words appear separately (e.g. "Send an email").
-    let query_tokens: Vec<String> = args[1..].iter().map(|a| a.to_lowercase()).collect();
-    let query_display = query_tokens.join(" ");
+    // Then expand each token via the synonym table so "email" also matches "gmail".
+    let raw_tokens: Vec<String> = args[1..].iter().map(|a| a.to_lowercase()).collect();
+    let query_display = raw_tokens.join(" ");
 
     println!("Searching for skills matching \"{}\"...\n", query_display);
 
     let mut results = 0;
 
-    // Returns true when every token in query_tokens appears somewhere in the combined fields.
+    // For each raw token, pre-compute the full candidate set: the token itself plus all
+    // synonym expansions. e.g. "email" → ["email", "gmail"].
+    // matches() then requires ALL raw tokens to have at least one candidate appear in the
+    // combined fields (token-AND with synonym-OR per token).
+    let token_candidates: Vec<Vec<String>> = raw_tokens
+        .iter()
+        .map(|t| expand_tokens(std::slice::from_ref(t)))
+        .collect();
+
     let matches = |fields: &[&str]| -> bool {
         let combined = fields.join(" ").to_lowercase();
-        query_tokens.iter().all(|t| combined.contains(t.as_str()))
+        token_candidates
+            .iter()
+            .all(|candidates| candidates.iter().any(|c| combined.contains(c.as_str())))
     };
 
     // Search Services
@@ -150,4 +221,82 @@ pub async fn handle_skills_command(args: &[String]) -> Result<(), GwsError> {
     }
 
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_expand_tokens_no_synonym() {
+        let tokens = vec!["gmail".to_string()];
+        let expanded = expand_tokens(&tokens);
+        assert_eq!(expanded, vec!["gmail"]);
+    }
+
+    #[test]
+    fn test_expand_tokens_email_expands_to_gmail() {
+        let tokens = vec!["email".to_string()];
+        let expanded = expand_tokens(&tokens);
+        assert!(expanded.contains(&"email".to_string()));
+        assert!(expanded.contains(&"gmail".to_string()));
+    }
+
+    #[test]
+    fn test_expand_tokens_spreadsheet_expands_to_sheets() {
+        let tokens = vec!["spreadsheet".to_string()];
+        let expanded = expand_tokens(&tokens);
+        assert!(expanded.contains(&"sheets".to_string()));
+    }
+
+    #[test]
+    fn test_expand_tokens_no_duplicates() {
+        // "sheet" and "sheets" both expand to "sheets", but "sheets" should appear only once
+        let tokens = vec!["sheet".to_string(), "sheets".to_string()];
+        let expanded = expand_tokens(&tokens);
+        let sheets_count = expanded.iter().filter(|t| t.as_str() == "sheets").count();
+        assert_eq!(sheets_count, 1);
+    }
+
+    #[test]
+    fn test_expand_tokens_multi_word() {
+        let tokens = vec!["send".to_string(), "email".to_string()];
+        let expanded = expand_tokens(&tokens);
+        assert!(expanded.contains(&"send".to_string()));
+        assert!(expanded.contains(&"email".to_string()));
+        assert!(expanded.contains(&"gmail".to_string()));
+    }
+
+    #[test]
+    fn test_expand_tokens_preserves_original() {
+        // Even after expansion, the original token must be retained
+        let tokens = vec!["mail".to_string()];
+        let expanded = expand_tokens(&tokens);
+        assert!(expanded.contains(&"mail".to_string()));
+        assert!(expanded.contains(&"gmail".to_string()));
+    }
+
+    #[test]
+    fn test_synonyms_table_no_duplicate_terms() {
+        // Each (term, canonical) pair should be unique to avoid redundant expansions
+        let mut seen = std::collections::HashSet::new();
+        for (term, canonical) in SYNONYMS {
+            let key = (*term, *canonical);
+            assert!(
+                seen.insert(key),
+                "Duplicate synonym entry: ({term}, {canonical})"
+            );
+        }
+    }
+
+    #[test]
+    fn test_synonyms_all_canonicals_are_lowercase() {
+        for (_, canonical) in SYNONYMS {
+            assert_eq!(
+                *canonical,
+                canonical.to_lowercase(),
+                "Canonical '{canonical}' is not lowercase"
+            );
+        }
+    }
 }
