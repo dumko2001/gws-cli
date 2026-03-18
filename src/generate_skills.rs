@@ -785,7 +785,7 @@ fn render_persona_skill(persona: &PersonaEntry) -> String {
     let required_skills = persona
         .services
         .iter()
-        .map(|s| format!("\"references/gws-{s}\""))
+        .map(|s| format!("\"gws-{s}\""))
         .collect::<Vec<_>>()
         .join(", ");
 
@@ -822,7 +822,7 @@ metadata:
         skills_list = persona
             .services
             .iter()
-            .map(|s| format!("`references/gws-{s}`"))
+            .map(|s| format!("[`gws-{s}`](../references/gws-{s}/SKILL.md)"))
             .collect::<Vec<_>>()
             .join(", "),
         workflows = persona
@@ -855,7 +855,7 @@ fn render_recipe_skill(recipe: &RecipeEntry) -> String {
     let required_skills = recipe
         .services
         .iter()
-        .map(|s| format!("\"references/gws-{s}\""))
+        .map(|s| format!("\"gws-{s}\""))
         .collect::<Vec<_>>()
         .join(", ");
 
@@ -890,7 +890,7 @@ metadata:
         skills_list = recipe
             .services
             .iter()
-            .map(|s| format!("`references/gws-{s}`"))
+            .map(|s| format!("[`gws-{s}`](../references/gws-{s}/SKILL.md)"))
             .collect::<Vec<_>>()
             .join(", "),
     ));
