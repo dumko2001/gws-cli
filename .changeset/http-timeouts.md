@@ -1,1 +1,1 @@
----\n"@googleworkspace/cli": patch\n---\n\nfix(client): add connect and request timeouts to prevent indefinite hangs
+---\n"@googleworkspace/cli": patch\n---\n\nfix(client): add 10s connect timeout to prevent hangs on initial connection
