@@ -311,14 +311,16 @@ pub(crate) fn select_scope(scopes: &[String]) -> Option<&str> {
     scopes
         .iter()
         .map(|s| {
-            let priority = if s.contains(".readonly") {
+            let priority = if s.ends_with(".readonly") {
                 1 // Most compatible with typical user logins
-            } else if s.contains(".metadata") {
+            } else if s.ends_with(".metadata") {
                 10 // Restrictive, avoid if broader is available
             } else if s.contains("cloud-platform") {
                 50 // Extremely broad, avoid if possible
+            } else if s.contains("googleapis.com/auth/") {
+                5 // Specific service scopes (e.g., drive, gmail.modify)
             } else {
-                5 // Standard service scopes (e.g., drive, gmail.modify)
+                20 // Broad alias scopes (e.g., https://mail.google.com/)
             };
             (priority, s.as_str())
         })
