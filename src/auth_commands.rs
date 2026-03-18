@@ -923,6 +923,71 @@ fn run_simple_scope_picker(services_filter: Option<&HashSet<String>>) -> Option<
     }
 }
 
+async fn get_status_access_token(
+    http_client: &reqwest::Client,
+    output: &mut serde_json::Value,
+) -> Option<String> {
+    let direct_token = std::env::var("GOOGLE_WORKSPACE_CLI_TOKEN")
+        .ok()
+        .filter(|t| !t.is_empty());
+
+    if let Some(token) = direct_token {
+        return Some(token);
+    }
+
+    let enc_path = credential_store::encrypted_credentials_path();
+    let plain_path = plain_credentials_path();
+
+    let creds_json_str = if enc_path.exists() {
+        credential_store::load_encrypted().ok()
+    } else if plain_path.exists() {
+        std::fs::read_to_string(&plain_path).ok()
+    } else {
+        None
+    };
+
+    let creds_str = creds_json_str?;
+    let creds: serde_json::Value = serde_json::from_str(&creds_str).ok()?;
+    let client_id = creds.get("client_id")?.as_str()?;
+    let client_secret = creds.get("client_secret")?.as_str()?;
+    let refresh_token = creds.get("refresh_token")?.as_str()?;
+
+    // Exchange refresh token for access token
+    let token_resp = http_client
+        .post("https://oauth2.googleapis.com/token")
+        .form(&[
+            ("client_id", client_id),
+            ("client_secret", client_secret),
+            ("refresh_token", refresh_token),
+            ("grant_type", "refresh_token"),
+        ])
+        .send()
+        .await;
+
+    match token_resp {
+        Ok(resp) => {
+            if let Ok(token_json) = resp.json::<serde_json::Value>().await {
+                if let Some(access_token) = token_json.get("access_token").and_then(|v| v.as_str()) {
+                    Some(access_token.to_string())
+                } else {
+                    output["token_valid"] = serde_json::json!(false);
+                    if let Some(err) = token_json.get("error_description").and_then(|v| v.as_str()) {
+                        output["token_error"] = serde_json::json!(err);
+                    }
+                    None
+                }
+            } else {
+                None
+            }
+        }
+        Err(e) => {
+            output["token_valid"] = serde_json::json!(false);
+            output["token_error"] = serde_json::json!(e.to_string());
+            None
+        }
+    }
+}
+
 async fn handle_status() -> Result<(), GwsError> {
     let plain_path = plain_credentials_path();
     let enc_path = credential_store::encrypted_credentials_path();
@@ -1070,84 +1135,11 @@ async fn handle_status() -> Result<(), GwsError> {
     // If we have credentials or a direct token, try to get live info (user, scopes, APIs)
     // Skip all network calls and subprocess spawning in test builds
     if !cfg!(test) {
-        let direct_token = std::env::var("GOOGLE_WORKSPACE_CLI_TOKEN")
-            .ok()
-            .filter(|t| !t.is_empty());
-
-        let access_token = if let Some(token) = direct_token {
-            Some(token)
-        } else {
-            let creds_json_str = if has_encrypted {
-                credential_store::load_encrypted().ok()
-            } else if has_plain {
-                tokio::fs::read_to_string(&plain_path).await.ok()
-            } else {
-                None
-            };
-
-            if let Some(creds_str) = creds_json_str {
-                if let Ok(creds) = serde_json::from_str::<serde_json::Value>(&creds_str) {
-                    let client_id = creds.get("client_id").and_then(|v| v.as_str());
-                    let client_secret = creds.get("client_secret").and_then(|v| v.as_str());
-                    let refresh_token = creds.get("refresh_token").and_then(|v| v.as_str());
-
-                    if let (Some(cid), Some(csec), Some(rt)) =
-                        (client_id, client_secret, refresh_token)
-                    {
-                        // Exchange refresh token for access token
-                        let http_client = reqwest::Client::new();
-                        let token_resp = http_client
-                            .post("https://oauth2.googleapis.com/token")
-                            .form(&[
-                                ("client_id", cid),
-                                ("client_secret", csec),
-                                ("refresh_token", rt),
-                                ("grant_type", "refresh_token"),
-                            ])
-                            .send()
-                            .await;
-
-                        match token_resp {
-                            Ok(resp) => {
-                                if let Ok(token_json) = resp.json::<serde_json::Value>().await {
-                                    if let Some(access_token) =
-                                        token_json.get("access_token").and_then(|v| v.as_str())
-                                    {
-                                        Some(access_token.to_string())
-                                    } else {
-                                        output["token_valid"] = json!(false);
-                                        if let Some(err) = token_json
-                                            .get("error_description")
-                                            .and_then(|v| v.as_str())
-                                        {
-                                            output["token_error"] = json!(err);
-                                        }
-                                        None
-                                    }
-                                } else {
-                                    None
-                                }
-                            }
-                            Err(e) => {
-                                output["token_valid"] = json!(false);
-                                output["token_error"] = json!(e.to_string());
-                                None
-                            }
-                        }
-                    } else {
-                        None
-                    }
-                } else {
-                    None
-                }
-            } else {
-                None
-            }
-        };
+        let http_client = reqwest::Client::new();
+        let access_token = get_status_access_token(&http_client, &mut output).await;
 
         if let Some(at) = access_token {
             output["token_valid"] = json!(true);
-            let http_client = reqwest::Client::new();
 
             // Get user info
             if let Ok(user_resp) = http_client
@@ -1164,8 +1156,12 @@ async fn handle_status() -> Result<(), GwsError> {
             }
 
             // Get granted scopes via tokeninfo
-            let tokeninfo_url = format!("https://oauth2.googleapis.com/tokeninfo?access_token={}", at);
-            if let Ok(info_resp) = http_client.get(&tokeninfo_url).send().await {
+            if let Ok(info_resp) = http_client
+                .get("https://oauth2.googleapis.com/tokeninfo")
+                .query(&[("access_token", &at)])
+                .send()
+                .await
+            {
                 if let Ok(info_json) = info_resp.json::<serde_json::Value>().await {
                     if let Some(scope_str) = info_json.get("scope").and_then(|v| v.as_str()) {
                         let scopes: Vec<&str> = scope_str.split(' ').collect();
@@ -1185,6 +1181,7 @@ async fn handle_status() -> Result<(), GwsError> {
             }
         }
     } // end !cfg!(test)
+
 
     println!(
         "{}",
