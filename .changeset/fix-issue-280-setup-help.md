@@ -1,1 +1,1 @@
----\n"gws": patch\n---\n\nfix(setup): handle --help explicitly in setup flow to prevent accidental project creation
+---\n"@googleworkspace/cli": patch\n---\n\nfix(setup): handle --help explicitly in setup flow to prevent accidental project creation
