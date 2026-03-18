@@ -1,1 +1,1 @@
----\n"gws": patch\n---\n\nfix(client): add connect and request timeouts to prevent indefinite hangs
+---\n"@googleworkspace/cli": patch\n---\n\nfix(client): add connect and request timeouts to prevent indefinite hangs
