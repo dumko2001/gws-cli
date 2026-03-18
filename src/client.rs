@@ -46,11 +46,7 @@ where
             return Ok(resp);
         }
 
-        // Only sleep if we have retries left
-        if attempt == MAX_RETRIES - 1 {
-            return Ok(resp);
-        }
-
+        // If we still have retries, sleep and continue
         let header_value = resp
             .headers()
             .get("retry-after")
