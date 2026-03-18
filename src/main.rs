@@ -298,15 +298,42 @@ async fn run() -> Result<(), GwsError> {
     .map(|_| ())
 }
 
-/// Select the best scope from a method's scope list.
+/// Select the best scope for the method from its list of alternatives.
 ///
 /// Discovery Documents list method scopes as alternatives — any single scope
-/// grants access. The first scope is typically the broadest. Using all scopes
-/// causes issues when restrictive scopes (e.g., `gmail.metadata`) are included,
-/// as the API enforces that scope's restrictions even when broader scopes are
-/// also present.
+/// grants access. We pick the most appropriate one based on a heuristic:
+/// 1. Prefer narrower scopes (e.g., `.readonly`) as they are more likely to
+///    be present in the token cache (fixes #519).
+/// 2. Avoid restrictive scopes (e.g., `.metadata`) if broader alternatives
+///    are available, as the API may enforce the most restrictive scope's
+///    limitations even when broader ones are present.
 pub(crate) fn select_scope(scopes: &[String]) -> Option<&str> {
-    scopes.first().map(|s| s.as_str())
+    if scopes.is_empty() {
+        return None;
+    }
+
+    let mut best_scope: Option<&str> = None;
+    let mut best_priority = 100;
+
+    for scope in scopes {
+        // Priority mapping (lower is better)
+        let priority = if scope.contains(".readonly") {
+            1 // Most compatible with typical user logins
+        } else if scope.contains(".metadata") {
+            10 // Restrictive, avoid if broader is available
+        } else if scope.contains("cloud-platform") {
+            50 // Extremely broad, avoid if possible
+        } else {
+            5 // Standard service scopes (e.g., drive, gmail.modify)
+        };
+
+        if priority < best_priority {
+            best_priority = priority;
+            best_scope = Some(scope.as_str());
+        }
+    }
+
+    best_scope.or_else(|| scopes.first().map(|s| s.as_str()))
 }
 
 fn parse_pagination_config(matches: &clap::ArgMatches) -> executor::PaginationConfig {
@@ -710,14 +737,31 @@ mod tests {
     }
 
     #[test]
-    fn test_select_scope_picks_first() {
+    fn test_select_scope_prefers_readonly() {
         let scopes = vec![
             "https://mail.google.com/".to_string(),
             "https://www.googleapis.com/auth/gmail.metadata".to_string(),
             "https://www.googleapis.com/auth/gmail.modify".to_string(),
             "https://www.googleapis.com/auth/gmail.readonly".to_string(),
         ];
-        assert_eq!(select_scope(&scopes), Some("https://mail.google.com/"));
+        // .readonly should be preferred over the first one (mail.google.com)
+        assert_eq!(
+            select_scope(&scopes),
+            Some("https://www.googleapis.com/auth/gmail.readonly")
+        );
+    }
+
+    #[test]
+    fn test_select_scope_avoids_metadata() {
+        let scopes = vec![
+            "https://www.googleapis.com/auth/gmail.metadata".to_string(),
+            "https://www.googleapis.com/auth/gmail.modify".to_string(),
+        ];
+        // .modify should be preferred over .metadata
+        assert_eq!(
+            select_scope(&scopes),
+            Some("https://www.googleapis.com/auth/gmail.modify")
+        );
     }
 
     #[test]
