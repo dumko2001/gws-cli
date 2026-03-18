@@ -1,0 +1,1 @@
+---\n"gws": patch\n---\n\nfix(auth): move keyring backend status message to debug log to reduce stderr pollution
