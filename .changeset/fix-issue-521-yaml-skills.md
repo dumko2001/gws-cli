@@ -1,1 +1,1 @@
----\n"gws": patch\n---\n\nfix(skills): use block sequences for YAML frontmatter to improve compatibility with validation tools
+---\n"@googleworkspace/cli": patch\n---\n\nfix(skills): use block sequences for YAML frontmatter to improve compatibility with validation tools
