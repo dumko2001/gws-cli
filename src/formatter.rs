@@ -97,9 +97,7 @@ fn extract_items(value: &Value) -> Option<(&str, &Vec<Value>)> {
                 continue;
             }
             if let Value::Array(arr) = val {
-                if !arr.is_empty() {
-                    return Some((key, arr));
-                }
+                return Some((key, arr));
             }
         }
     }
@@ -640,9 +638,9 @@ mod tests {
     #[test]
     fn test_format_table_empty_array() {
         let val = json!({"files": []});
-        // No items to extract, falls back to single-object table
+        // Items are extracted correctly, but since the array is empty, we get (empty)
         let output = format_value(&val, &OutputFormat::Table);
-        assert!(output.contains("files"));
+        assert_eq!(output, "(empty)\n");
     }
 
     #[test]
