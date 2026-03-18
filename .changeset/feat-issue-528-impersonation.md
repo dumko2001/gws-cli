@@ -1,0 +1,1 @@
+---\n"gws": patch\n---\n\nfeat(auth): support Domain-Wide Delegation for Service Accounts
