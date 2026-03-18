@@ -200,11 +200,20 @@ async fn get_token_inner(
                 .map(|f| f.to_string_lossy().to_string())
                 .unwrap_or_else(|| "token_cache.json".to_string());
             let sa_cache = token_cache_path.with_file_name(format!("sa_{tc_filename}"));
-            let builder = yup_oauth2::ServiceAccountAuthenticator::builder(key).with_storage(
-                Box::new(crate::token_storage::EncryptedTokenStorage::new(sa_cache)),
-            );
+
+            // Support Domain-Wide Delegation (impersonation)
+            let mut builder = yup_oauth2::ServiceAccountAuthenticator::builder(key);
+            if let Ok(sub) = std::env::var("GOOGLE_WORKSPACE_IMPERSONATE_USER") {
+                if !sub.is_empty() {
+                    tracing::debug!(impersonate = %sub, "Using Domain-Wide Delegation");
+                    builder = builder.subject(sub);
+                }
+            }
 
             let auth = builder
+                .with_storage(Box::new(crate::token_storage::EncryptedTokenStorage::new(
+                    sa_cache,
+                )))
                 .build()
                 .await
                 .context("Failed to build service account authenticator")?;
