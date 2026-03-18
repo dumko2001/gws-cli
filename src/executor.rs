@@ -166,6 +166,7 @@ fn build_http_request(
     page_token: Option<&str>,
     pages_fetched: u32,
     upload: &Option<UploadSource<'_>>,
+    resolved_file_size: Option<u64>,
 ) -> Result<reqwest::RequestBuilder, GwsError> {
     let mut request = match method.http_method.as_str() {
         "GET" => client.get(&input.full_url),
@@ -212,13 +213,11 @@ fn build_http_request(
                     build_multipart_bytes(&input.body, data, content_type)?
                 }
                 UploadSource::File { path, content_type } => {
-                    let file_meta = std::fs::metadata(path).map_err(|e| {
-                        GwsError::Validation(format!(
-                            "Failed to get metadata for upload file '{}': {}",
-                            path, e
+                    let file_size = resolved_file_size.ok_or_else(|| {
+                        GwsError::Other(anyhow::anyhow!(
+                            "Internal error: file size not resolved for upload"
                         ))
                     })?;
-                    let file_size = file_meta.len();
                     let media_mime = resolve_upload_mime(*content_type, Some(path), &input.body);
                     build_multipart_stream(&input.body, path, file_size, &media_mime)?
                 }
@@ -436,6 +435,14 @@ pub async fn execute_method(
     let mut pages_fetched: u32 = 0;
     let mut captured_values = Vec::new();
 
+    // Resolve file metadata once before loop if uploading a file
+    let mut resolved_file_size: Option<u64> = None;
+    if let Some(UploadSource::File { path, .. }) = &upload {
+        resolved_file_size = Some(tokio::fs::metadata(path).await.map_err(|e| {
+            GwsError::Validation(format!("Failed to get metadata for upload file '{}': {}", path, e))
+        })?.len());
+    }
+
     loop {
         let method_id = method.id.as_deref().unwrap_or("unknown");
         let start = std::time::Instant::now();
@@ -451,6 +458,7 @@ pub async fn execute_method(
                 page_token.as_deref(),
                 pages_fetched,
                 &upload,
+                resolved_file_size,
             )?)
         })
         .await
