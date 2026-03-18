@@ -1,0 +1,1 @@
+---\n"gws": patch\n---\n\nfeat(services): register Apps Script and Google Photos APIs
