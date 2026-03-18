@@ -1,1 +1,1 @@
----\n"gws": patch\n---\n\nfix(auth): report token info in status when using GOOGLE_WORKSPACE_CLI_TOKEN to improve clarity
+---\n"@googleworkspace/cli": patch\n---\n\nfix(auth): report token info in status when using GOOGLE_WORKSPACE_CLI_TOKEN to improve clarity
