@@ -130,6 +130,12 @@ pub async fn handle_skills_command(args: &[String]) -> Result<(), GwsError> {
     }
     let query_display = raw_tokens.join(" ");
 
+    if raw_tokens.is_empty() {
+        return Err(GwsError::Validation(
+            "No search query provided. Usage: gws skills search <query>".to_string(),
+        ));
+    }
+
     println!("Searching for skills matching \"{}\"...\n", query_display);
 
     let mut results = 0;
