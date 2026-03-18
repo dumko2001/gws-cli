@@ -157,7 +157,7 @@ fn parse_and_validate_inputs(
 
 /// Build an HTTP request with auth, query params, page token, and body/multipart attachment.
 #[allow(clippy::too_many_arguments)]
-async fn build_http_request(
+fn build_http_request(
     client: &reqwest::Client,
     method: &RestMethod,
     input: &ExecutionInput,
@@ -212,7 +212,7 @@ async fn build_http_request(
                     build_multipart_bytes(&input.body, data, content_type)?
                 }
                 UploadSource::File { path, content_type } => {
-                    let file_meta = tokio::fs::metadata(path).await.map_err(|e| {
+                    let file_meta = std::fs::metadata(path).map_err(|e| {
                         GwsError::Validation(format!(
                             "Failed to get metadata for upload file '{}': {}",
                             path, e
@@ -431,27 +431,32 @@ pub async fn execute_method(
         return Ok(None);
     }
 
+    let client = crate::client::build_client()?;
     let mut page_token: Option<String> = None;
     let mut pages_fetched: u32 = 0;
     let mut captured_values = Vec::new();
 
     loop {
-        let client = crate::client::build_client()?;
-        let request = build_http_request(
-            &client,
-            method,
-            &input,
-            token,
-            &auth_method,
-            page_token.as_deref(),
-            pages_fetched,
-            &upload,
-        )
-        .await?;
-
         let method_id = method.id.as_deref().unwrap_or("unknown");
         let start = std::time::Instant::now();
-        let response = request.send().await.context("HTTP request failed")?;
+
+        // Wrap the request builder in send_with_retry to handle rate limits and transient 5xx
+        let response = crate::client::send_with_retry(|| {
+            build_http_request(
+                &client,
+                method,
+                &input,
+                token,
+                &auth_method,
+                page_token.as_deref(),
+                pages_fetched,
+                &upload,
+            )
+            .expect("Request builder should not fail during retry")
+        })
+        .await
+        .context("HTTP request failed")?;
+
         let latency_ms = start.elapsed().as_millis() as u64;
 
         let status = response.status();
@@ -2311,7 +2316,6 @@ async fn test_post_without_body_sets_content_length_zero() {
         0,
         &None,
     )
-    .await
     .unwrap();
 
     let built = request.build().unwrap();
@@ -2351,7 +2355,6 @@ async fn test_post_with_body_does_not_add_content_length_zero() {
         0,
         &None,
     )
-    .await
     .unwrap();
 
     let built = request.build().unwrap();
@@ -2389,7 +2392,6 @@ async fn test_get_does_not_set_content_length_zero() {
         0,
         &None,
     )
-    .await
     .unwrap();
 
     let built = request.build().unwrap();

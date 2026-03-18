@@ -24,7 +24,7 @@ const MAX_RETRIES: u32 = 3;
 /// or misconfigured server from hanging the process indefinitely.
 const MAX_RETRY_DELAY_SECS: u64 = 60;
 
-/// Send an HTTP request with automatic retry on 429 (rate limit) responses.
+/// Send an HTTP request with automatic retry on 429 (rate limit) and transient 5xx responses.
 /// Respects the `Retry-After` header; falls back to exponential backoff (1s, 2s, 4s).
 pub async fn send_with_retry(
     build_request: impl Fn() -> reqwest::RequestBuilder,
@@ -32,7 +32,21 @@ pub async fn send_with_retry(
     for attempt in 0..MAX_RETRIES {
         let resp = build_request().send().await?;
 
-        if resp.status() != reqwest::StatusCode::TOO_MANY_REQUESTS {
+        let status = resp.status();
+        if status.is_success()
+            || !matches!(
+                status,
+                reqwest::StatusCode::TOO_MANY_REQUESTS
+                    | reqwest::StatusCode::INTERNAL_SERVER_ERROR
+                    | reqwest::StatusCode::BAD_GATEWAY
+                    | reqwest::StatusCode::SERVICE_UNAVAILABLE
+            )
+        {
+            return Ok(resp);
+        }
+
+        // Only sleep if we have retries left
+        if attempt == MAX_RETRIES - 1 {
             return Ok(resp);
         }
 
