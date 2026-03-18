@@ -294,8 +294,7 @@ fn get_or_create_key() -> anyhow::Result<[u8; 32]> {
     }
 
     let backend = KeyringBackend::from_env();
-    // Item 5: log which backend was selected
-    eprintln!("Using keyring backend: {}", backend.as_str());
+    tracing::debug!("Using keyring backend: {}", backend.as_str());
 
     let username = std::env::var("USER")
         .or_else(|_| std::env::var("USERNAME"))
