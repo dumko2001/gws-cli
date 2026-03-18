@@ -1,0 +1,1 @@
+---\n"gws": patch\n---\n\nfix(auth): improve scope selection heuristic to prefer standard/readonly scopes over restrictive ones
