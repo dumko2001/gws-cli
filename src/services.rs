@@ -126,6 +126,18 @@ pub const SERVICES: &[ServiceEntry] = &[
         version: "v1",
         description: "Cross-service productivity workflows",
     },
+    ServiceEntry {
+        aliases: &["script"],
+        api_name: "script",
+        version: "v1",
+        description: "Manage Apps Script projects and deployments",
+    },
+    ServiceEntry {
+        aliases: &["photos"],
+        api_name: "photoslibrary",
+        version: "v1",
+        description: "Manage Google Photos library",
+    },
 ];
 
 /// Resolves a service alias to (api_name, version).
