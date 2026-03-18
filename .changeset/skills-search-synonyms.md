@@ -1,1 +1,1 @@
----\n"gws": patch\n---\n\nfeat(skills): add synonym expansion to skills search and improve persona/recipe skill generation with relative links
+---\n"@googleworkspace/cli": patch\n---\n\nfeat(skills): add synonym expansion to skills search and improve persona/recipe skill generation with relative links
