@@ -31,7 +31,18 @@ where
     F: Fn() -> anyhow::Result<reqwest::RequestBuilder>,
 {
     for attempt in 0..MAX_RETRIES {
-        let resp = build_request()?.send().await?;
+        let req_result = build_request()?.send().await;
+
+        let resp = match req_result {
+            Ok(r) => r,
+            Err(e) if attempt < MAX_RETRIES - 1 && (e.is_timeout() || e.is_connect()) => {
+                let retry_after = compute_retry_delay(None, attempt);
+                tracing::debug!(error = %e, attempt, retry_after, "Retrying on network error");
+                tokio::time::sleep(std::time::Duration::from_secs(retry_after)).await;
+                continue;
+            }
+            Err(e) => return Err(e.into()),
+        };
 
         let status = resp.status();
         if status.is_success()
@@ -53,6 +64,7 @@ where
             .and_then(|v| v.to_str().ok());
         let retry_after = compute_retry_delay(header_value, attempt);
 
+        tracing::debug!(status = %status, attempt, retry_after, "Retrying on server error");
         tokio::time::sleep(std::time::Duration::from_secs(retry_after)).await;
     }
 
