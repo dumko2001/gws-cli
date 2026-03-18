@@ -1,0 +1,1 @@
+---\n"gws": patch\n---\n\nfix(formatter): correctly handle empty list responses from API
