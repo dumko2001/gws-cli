@@ -332,7 +332,7 @@ async fn handle_agenda(matches: &ArgMatches) -> Result<(), GwsError> {
                 );
 
                 let resp = crate::client::send_with_retry(|| {
-                    client
+                    Ok(client
                         .get(&events_url)
                         .query(&[
                             ("timeMin", time_min.as_str()),
@@ -341,7 +341,7 @@ async fn handle_agenda(matches: &ArgMatches) -> Result<(), GwsError> {
                             ("orderBy", "startTime"),
                             ("maxResults", "50"),
                         ])
-                        .bearer_auth(token)
+                        .bearer_auth(token))
                 })
                 .await;
 

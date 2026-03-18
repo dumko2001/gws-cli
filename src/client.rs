@@ -26,11 +26,12 @@ const MAX_RETRY_DELAY_SECS: u64 = 60;
 
 /// Send an HTTP request with automatic retry on 429 (rate limit) and transient 5xx responses.
 /// Respects the `Retry-After` header; falls back to exponential backoff (1s, 2s, 4s).
-pub async fn send_with_retry(
-    build_request: impl Fn() -> reqwest::RequestBuilder,
-) -> Result<reqwest::Response, reqwest::Error> {
+pub async fn send_with_retry<F>(build_request: F) -> anyhow::Result<reqwest::Response>
+where
+    F: Fn() -> anyhow::Result<reqwest::RequestBuilder>,
+{
     for attempt in 0..MAX_RETRIES {
-        let resp = build_request().send().await?;
+        let resp = build_request()?.send().await?;
 
         let status = resp.status();
         if status.is_success()
@@ -60,7 +61,7 @@ pub async fn send_with_retry(
     }
 
     // Final attempt — return whatever we get
-    build_request().send().await
+    Ok(build_request()?.send().await?)
 }
 
 /// Compute the retry delay from a Retry-After header value and attempt number.

@@ -442,7 +442,7 @@ pub async fn execute_method(
 
         // Wrap the request builder in send_with_retry to handle rate limits and transient 5xx
         let response = crate::client::send_with_retry(|| {
-            build_http_request(
+            Ok(build_http_request(
                 &client,
                 method,
                 &input,
@@ -451,8 +451,7 @@ pub async fn execute_method(
                 page_token.as_deref(),
                 pages_fetched,
                 &upload,
-            )
-            .expect("Request builder should not fail during retry")
+            )?)
         })
         .await
         .context("HTTP request failed")?;

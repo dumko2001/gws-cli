@@ -144,9 +144,9 @@ pub(super) struct ReplyConfig {
 
 async fn fetch_user_email(client: &reqwest::Client, token: &str) -> Result<String, GwsError> {
     let resp = crate::client::send_with_retry(|| {
-        client
+        Ok(client
             .get("https://gmail.googleapis.com/gmail/v1/users/me/profile")
-            .bearer_auth(token)
+            .bearer_auth(token))
     })
     .await
     .map_err(|e| GwsError::Other(anyhow::anyhow!("Failed to fetch user profile: {e}")))?;

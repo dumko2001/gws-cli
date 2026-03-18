@@ -106,7 +106,7 @@ pub async fn handle_triage(matches: &ArgMatches) -> Result<(), GwsError> {
                 );
 
                 let get_resp = crate::client::send_with_retry(|| {
-                    client.get(&get_url).bearer_auth(token)
+                    Ok(client.get(&get_url).bearer_auth(token))
                 })
                 .await
                 .ok()?;

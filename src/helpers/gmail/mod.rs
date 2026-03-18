@@ -335,10 +335,10 @@ pub(super) async fn fetch_message_metadata(
     );
 
     let resp = crate::client::send_with_retry(|| {
-        client
+        Ok(client
             .get(&url)
             .bearer_auth(token)
-            .query(&[("format", "full")])
+            .query(&[("format", "full")]))
     })
     .await
     .map_err(|e| GwsError::Other(anyhow::anyhow!("Failed to fetch message: {e}")))?;
