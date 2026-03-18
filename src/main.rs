@@ -308,32 +308,22 @@ async fn run() -> Result<(), GwsError> {
 ///    are available, as the API may enforce the most restrictive scope's
 ///    limitations even when broader ones are present.
 pub(crate) fn select_scope(scopes: &[String]) -> Option<&str> {
-    if scopes.is_empty() {
-        return None;
-    }
-
-    let mut best_scope: Option<&str> = None;
-    let mut best_priority = 100;
-
-    for scope in scopes {
-        // Priority mapping (lower is better)
-        let priority = if scope.contains(".readonly") {
-            1 // Most compatible with typical user logins
-        } else if scope.contains(".metadata") {
-            10 // Restrictive, avoid if broader is available
-        } else if scope.contains("cloud-platform") {
-            50 // Extremely broad, avoid if possible
-        } else {
-            5 // Standard service scopes (e.g., drive, gmail.modify)
-        };
-
-        if priority < best_priority {
-            best_priority = priority;
-            best_scope = Some(scope.as_str());
-        }
-    }
-
-    best_scope.or_else(|| scopes.first().map(|s| s.as_str()))
+    scopes
+        .iter()
+        .map(|s| {
+            let priority = if s.contains(".readonly") {
+                1 // Most compatible with typical user logins
+            } else if s.contains(".metadata") {
+                10 // Restrictive, avoid if broader is available
+            } else if s.contains("cloud-platform") {
+                50 // Extremely broad, avoid if possible
+            } else {
+                5 // Standard service scopes (e.g., drive, gmail.modify)
+            };
+            (priority, s.as_str())
+        })
+        .min_by_key(|(p, _)| *p)
+        .map(|(_, s)| s)
 }
 
 fn parse_pagination_config(matches: &clap::ArgMatches) -> executor::PaginationConfig {
