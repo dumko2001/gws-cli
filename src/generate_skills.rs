@@ -390,7 +390,8 @@ metadata:
   openclaw:
     category: "productivity"
     requires:
-      bins: ["gws"]
+      bins:
+        - "gws"
     cliHelp: "gws {alias} --help"
 ---
 
@@ -526,7 +527,8 @@ metadata:
   openclaw:
     category: "{category}"
     requires:
-      bins: ["gws"]
+      bins:
+        - "gws"
     cliHelp: "gws {alias} {cmd_name} --help"
 ---
 
@@ -673,7 +675,8 @@ metadata:
   openclaw:
     category: "productivity"
     requires:
-      bins: ["gws"]
+      bins:
+        - "gws"
 ---
 
 # gws — Shared Reference
@@ -773,7 +776,8 @@ metadata:
   openclaw:
     category: "persona"
     requires:
-      bins: ["gws"]
+      bins:
+        - "gws"
       skills: [{skills}]
 ---
 
@@ -844,7 +848,8 @@ metadata:
     category: "recipe"
     domain: "{category}"
     requires:
-      bins: ["gws"]
+      bins:
+        - "gws"
       skills: [{skills}]
 ---
 
