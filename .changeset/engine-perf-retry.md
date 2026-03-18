@@ -1,0 +1,1 @@
+---\n"gws": patch\n---\n\nfix(executor): reuse HTTP client across paginated requests and implement global retry for 429/5xx status codes
