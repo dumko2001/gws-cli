@@ -1,1 +1,1 @@
----\n"gws": patch\n---\n\nfix(client): add 10s connect and 120s request timeouts to prevent indefinite hangs
+---\n"gws": patch\n---\n\nfix(client): add connect and request timeouts to prevent indefinite hangs
