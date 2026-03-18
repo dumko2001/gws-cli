@@ -1107,17 +1107,32 @@ async fn handle_status() -> Result<(), GwsError> {
                             .send()
                             .await;
 
-                        if let Ok(resp) = token_resp {
-                            if let Ok(token_json) = resp.json::<serde_json::Value>().await {
-                                token_json
-                                    .get("access_token")
-                                    .and_then(|v| v.as_str())
-                                    .map(|s| s.to_string())
-                            } else {
+                        match token_resp {
+                            Ok(resp) => {
+                                if let Ok(token_json) = resp.json::<serde_json::Value>().await {
+                                    if let Some(access_token) =
+                                        token_json.get("access_token").and_then(|v| v.as_str())
+                                    {
+                                        Some(access_token.to_string())
+                                    } else {
+                                        output["token_valid"] = json!(false);
+                                        if let Some(err) = token_json
+                                            .get("error_description")
+                                            .and_then(|v| v.as_str())
+                                        {
+                                            output["token_error"] = json!(err);
+                                        }
+                                        None
+                                    }
+                                } else {
+                                    None
+                                }
+                            }
+                            Err(e) => {
+                                output["token_valid"] = json!(false);
+                                output["token_error"] = json!(e.to_string());
                                 None
                             }
-                        } else {
-                            None
                         }
                     } else {
                         None
