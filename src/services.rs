@@ -25,58 +25,16 @@ pub struct ServiceEntry {
 /// All known services with metadata.
 pub const SERVICES: &[ServiceEntry] = &[
     ServiceEntry {
-        aliases: &["drive"],
-        api_name: "drive",
-        version: "v3",
-        description: "Manage files, folders, and shared drives",
-    },
-    ServiceEntry {
-        aliases: &["sheets"],
-        api_name: "sheets",
-        version: "v4",
-        description: "Read and write spreadsheets",
-    },
-    ServiceEntry {
-        aliases: &["gmail"],
-        api_name: "gmail",
-        version: "v1",
-        description: "Send, read, and manage email",
-    },
-    ServiceEntry {
-        aliases: &["calendar"],
-        api_name: "calendar",
-        version: "v3",
-        description: "Manage calendars and events",
-    },
-    ServiceEntry {
         aliases: &["admin-reports", "reports"],
         api_name: "admin",
         version: "reports_v1",
         description: "Audit logs and usage reports",
     },
     ServiceEntry {
-        aliases: &["docs"],
-        api_name: "docs",
-        version: "v1",
-        description: "Read and write Google Docs",
-    },
-    ServiceEntry {
-        aliases: &["slides"],
-        api_name: "slides",
-        version: "v1",
-        description: "Read and write presentations",
-    },
-    ServiceEntry {
-        aliases: &["tasks"],
-        api_name: "tasks",
-        version: "v1",
-        description: "Manage task lists and tasks",
-    },
-    ServiceEntry {
-        aliases: &["people"],
-        api_name: "people",
-        version: "v1",
-        description: "Manage contacts and profiles",
+        aliases: &["calendar"],
+        api_name: "calendar",
+        version: "v3",
+        description: "Manage calendars and events",
     },
     ServiceEntry {
         aliases: &["chat"],
@@ -91,10 +49,34 @@ pub const SERVICES: &[ServiceEntry] = &[
         description: "Manage classes, rosters, and coursework",
     },
     ServiceEntry {
+        aliases: &["docs"],
+        api_name: "docs",
+        version: "v1",
+        description: "Read and write Google Docs",
+    },
+    ServiceEntry {
+        aliases: &["drive"],
+        api_name: "drive",
+        version: "v3",
+        description: "Manage files, folders, and shared drives",
+    },
+    ServiceEntry {
+        aliases: &["events"],
+        api_name: "workspaceevents",
+        version: "v1",
+        description: "Subscribe to Google Workspace events",
+    },
+    ServiceEntry {
         aliases: &["forms"],
         api_name: "forms",
         version: "v1",
         description: "Read and write Google Forms",
+    },
+    ServiceEntry {
+        aliases: &["gmail"],
+        api_name: "gmail",
+        version: "v1",
+        description: "Send, read, and manage email",
     },
     ServiceEntry {
         aliases: &["keep"],
@@ -109,22 +91,22 @@ pub const SERVICES: &[ServiceEntry] = &[
         description: "Manage Google Meet conferences",
     },
     ServiceEntry {
-        aliases: &["events"],
-        api_name: "workspaceevents",
-        version: "v1",
-        description: "Subscribe to Google Workspace events",
-    },
-    ServiceEntry {
         aliases: &["modelarmor"],
         api_name: "modelarmor",
         version: "v1",
         description: "Filter user-generated content for safety",
     },
     ServiceEntry {
-        aliases: &["workflow", "wf"],
-        api_name: "workflow",
+        aliases: &["people"],
+        api_name: "people",
         version: "v1",
-        description: "Cross-service productivity workflows",
+        description: "Manage contacts and profiles",
+    },
+    ServiceEntry {
+        aliases: &["photos"],
+        api_name: "photoslibrary",
+        version: "v1",
+        description: "Manage Google Photos library",
     },
     ServiceEntry {
         aliases: &["script"],
@@ -133,10 +115,28 @@ pub const SERVICES: &[ServiceEntry] = &[
         description: "Manage Apps Script projects and deployments",
     },
     ServiceEntry {
-        aliases: &["photos"],
-        api_name: "photoslibrary",
+        aliases: &["sheets"],
+        api_name: "sheets",
+        version: "v4",
+        description: "Read and write spreadsheets",
+    },
+    ServiceEntry {
+        aliases: &["slides"],
+        api_name: "slides",
         version: "v1",
-        description: "Manage Google Photos library",
+        description: "Read and write presentations",
+    },
+    ServiceEntry {
+        aliases: &["tasks"],
+        api_name: "tasks",
+        version: "v1",
+        description: "Manage task lists and tasks",
+    },
+    ServiceEntry {
+        aliases: &["workflow", "wf"],
+        api_name: "workflow",
+        version: "v1",
+        description: "Cross-service productivity workflows",
     },
 ];
 
@@ -175,6 +175,14 @@ mod tests {
         assert_eq!(
             resolve_service("reports").unwrap(),
             ("admin".to_string(), "reports_v1".to_string())
+        );
+        assert_eq!(
+            resolve_service("photos").unwrap(),
+            ("photoslibrary".to_string(), "v1".to_string())
+        );
+        assert_eq!(
+            resolve_service("script").unwrap(),
+            ("script".to_string(), "v1".to_string())
         );
     }
 
