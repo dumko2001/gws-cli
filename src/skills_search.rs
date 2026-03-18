@@ -120,8 +120,14 @@ pub async fn handle_skills_command(args: &[String]) -> Result<(), GwsError> {
 
     // Split into individual tokens so multi-word queries like "send email" match
     // descriptions where the words appear separately (e.g. "Send an email").
-    // Then expand each token via the synonym table so "email" also matches "gmail".
-    let raw_tokens: Vec<String> = args[1..].iter().map(|a| a.to_lowercase()).collect();
+    // We split each argument by whitespace to handle cases where the user quoted
+    // their query (e.g. `gws skills search "send email"`).
+    let mut raw_tokens = Vec::new();
+    for arg in &args[1..] {
+        for token in arg.split_whitespace() {
+            raw_tokens.push(token.to_lowercase());
+        }
+    }
     let query_display = raw_tokens.join(" ");
 
     println!("Searching for skills matching \"{}\"...\n", query_display);
