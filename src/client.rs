@@ -30,12 +30,13 @@ pub async fn send_with_retry<F>(build_request: F) -> anyhow::Result<reqwest::Res
 where
     F: Fn() -> anyhow::Result<reqwest::RequestBuilder>,
 {
-    for attempt in 0..MAX_RETRIES {
+    // total attempts = MAX_RETRIES + 1
+    for attempt in 0..=MAX_RETRIES {
         let req_result = build_request()?.send().await;
 
         let resp = match req_result {
             Ok(r) => r,
-            Err(e) if attempt < MAX_RETRIES - 1 && (e.is_timeout() || e.is_connect()) => {
+            Err(e) if attempt < MAX_RETRIES && (e.is_timeout() || e.is_connect()) => {
                 let retry_after = compute_retry_delay(None, attempt);
                 tracing::debug!(error = %e, attempt, retry_after, "Retrying on network error");
                 tokio::time::sleep(std::time::Duration::from_secs(retry_after)).await;
@@ -58,18 +59,21 @@ where
         }
 
         // If we still have retries, sleep and continue
-        let header_value = resp
-            .headers()
-            .get("retry-after")
-            .and_then(|v| v.to_str().ok());
-        let retry_after = compute_retry_delay(header_value, attempt);
+        if attempt < MAX_RETRIES {
+            let header_value = resp
+                .headers()
+                .get("retry-after")
+                .and_then(|v| v.to_str().ok());
+            let retry_after = compute_retry_delay(header_value, attempt);
 
-        tracing::debug!(status = %status, attempt, retry_after, "Retrying on server error");
-        tokio::time::sleep(std::time::Duration::from_secs(retry_after)).await;
+            tracing::debug!(status = %status, attempt, retry_after, "Retrying on server error");
+            tokio::time::sleep(std::time::Duration::from_secs(retry_after)).await;
+        } else {
+            return Ok(resp);
+        }
     }
 
-    // Final attempt — return whatever we get
-    Ok(build_request()?.send().await?)
+    unreachable!("Loop should return on last attempt")
 }
 
 /// Compute the retry delay from a Retry-After header value and attempt number.
