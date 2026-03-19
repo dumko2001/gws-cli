@@ -92,14 +92,20 @@ impl EncryptedTokenStorage {
             #[cfg(unix)]
             {
                 use std::os::unix::fs::PermissionsExt;
-                std::fs::set_permissions(parent, std::fs::Permissions::from_mode(0o700))
-                    .map_err(|e| {
-                        anyhow::anyhow!(
-                            "Failed to set permissions on token directory '{}': {}",
-                            sanitize_for_terminal(&parent.display().to_string()),
-                            e
-                        )
-                    })?;
+                let parent_path = parent.to_path_buf();
+                let parent_display = parent.display().to_string();
+                tokio::task::spawn_blocking(move || {
+                    std::fs::set_permissions(&parent_path, std::fs::Permissions::from_mode(0o700))
+                })
+                .await
+                .map_err(|join_err| anyhow::anyhow!("Failed to run set_permissions task: {join_err}"))?
+                .map_err(|io_err| {
+                    anyhow::anyhow!(
+                        "Failed to set permissions on token directory '{}': {}",
+                        sanitize_for_terminal(&parent_display),
+                        io_err
+                    )
+                })?;
             }
         }
 
