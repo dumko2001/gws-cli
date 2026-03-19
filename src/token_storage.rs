@@ -82,11 +82,24 @@ impl EncryptedTokenStorage {
         let encrypted = crate::credential_store::encrypt(json.as_bytes())?;
 
         if let Some(parent) = self.file_path.parent() {
-            let _ = tokio::fs::create_dir_all(parent).await;
+            tokio::fs::create_dir_all(parent).await.map_err(|e| {
+                anyhow::anyhow!(
+                    "Failed to create token directory '{}': {}",
+                    sanitize_for_terminal(&parent.display().to_string()),
+                    e
+                )
+            })?;
             #[cfg(unix)]
             {
                 use std::os::unix::fs::PermissionsExt;
-                let _ = std::fs::set_permissions(parent, std::fs::Permissions::from_mode(0o700));
+                std::fs::set_permissions(parent, std::fs::Permissions::from_mode(0o700))
+                    .map_err(|e| {
+                        anyhow::anyhow!(
+                            "Failed to set permissions on token directory '{}': {}",
+                            sanitize_for_terminal(&parent.display().to_string()),
+                            e
+                        )
+                    })?;
             }
         }
 
