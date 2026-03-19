@@ -70,6 +70,32 @@ fn adc_well_known_path() -> Option<PathBuf> {
     })
 }
 
+/// Computes the service account token cache path.
+///
+/// When `impersonate_user` is `Some(email)`, returns a unique path using a SHA-256 hash
+/// of the email to avoid token cache collision between the service account and impersonated users.
+///
+/// When `impersonate_user` is `None`, returns the standard `sa_{filename}` path.
+fn sa_token_cache_path(token_cache_path: &std::path::Path, impersonate_user: Option<&str>) -> std::path::PathBuf {
+    let tc_filename = token_cache_path
+        .file_name()
+        .map(|f| f.to_string_lossy().to_string())
+        .unwrap_or_else(|| "token_cache.json".to_string());
+
+    if let Some(sub) = impersonate_user {
+        use sha2::{Sha256, Digest};
+        let mut hasher = Sha256::new();
+        hasher.update(sub.as_bytes());
+        let hash = hasher.finalize();
+        let hash_hex = format!("{:x}{:x}{:x}{:x}{:x}{:x}{:x}{:x}",
+            hash[0], hash[1], hash[2], hash[3],
+            hash[4], hash[5], hash[6], hash[7]);
+        token_cache_path.with_file_name(format!("sa_imp_{hash_hex}_{tc_filename}"))
+    } else {
+        token_cache_path.with_file_name(format!("sa_{tc_filename}"))
+    }
+}
+
 /// Types of credentials we support
 #[derive(Debug)]
 enum Credential {
@@ -195,19 +221,18 @@ async fn get_token_inner(
                 .to_string())
         }
         Credential::ServiceAccount(key) => {
-            let tc_filename = token_cache_path
-                .file_name()
-                .map(|f| f.to_string_lossy().to_string())
-                .unwrap_or_else(|| "token_cache.json".to_string());
-            let sa_cache = token_cache_path.with_file_name(format!("sa_{tc_filename}"));
-
             // Support Domain-Wide Delegation (impersonation)
+            // Read impersonation config early to determine cache file
+            let impersonate_user =
+                std::env::var("GOOGLE_WORKSPACE_IMPERSONATE_USER").ok().filter(|s| !s.is_empty());
+
+            // Create unique cache file for impersonation to avoid token collision
+            let sa_cache = sa_token_cache_path(token_cache_path, impersonate_user.as_deref());
+
             let mut builder = yup_oauth2::ServiceAccountAuthenticator::builder(key);
-            if let Ok(sub) = std::env::var("GOOGLE_WORKSPACE_IMPERSONATE_USER") {
-                if !sub.is_empty() {
-                    tracing::debug!(impersonate = %sub, "Using Domain-Wide Delegation");
-                    builder = builder.subject(sub);
-                }
+            if let Some(sub) = impersonate_user {
+                tracing::debug!(impersonate = %crate::error::sanitize_for_terminal(&sub), "Using Domain-Wide Delegation");
+                builder = builder.subject(sub);
             }
 
             let auth = builder
@@ -880,5 +905,86 @@ mod tests {
         let _config_guard = EnvVarGuard::remove("GOOGLE_WORKSPACE_CLI_CONFIG_DIR");
 
         assert_eq!(get_quota_project(), Some("my-project-123".to_string()));
+    }
+
+    #[test]
+    fn test_sa_token_cache_path_no_impersonation() {
+        let cache_path = std::path::PathBuf::from("/some/path/token_cache.json");
+        let result = sa_token_cache_path(&cache_path, None);
+        assert_eq!(result.file_name().unwrap().to_str().unwrap(), "sa_token_cache.json");
+    }
+
+    #[test]
+    fn test_token_cache_collision_without_fix() {
+        // PROOF OF BUG: The old code always used sa_{filename} regardless of impersonation.
+        // This caused token collision where service account tokens overwrote impersonated
+        // user tokens (and vice versa) when using the same scopes.
+        //
+        // Simulating OLD buggy behavior:
+        let cache_path = std::path::PathBuf::from("/some/path/token_cache.json");
+        let old_buggy_sa_cache = cache_path.with_file_name(format!(
+            "sa_{}",
+            cache_path.file_name().unwrap().to_str().unwrap()
+        ));
+
+        // OLD code: impersonation was ignored for cache filename
+        let old_with_impersonation = old_buggy_sa_cache.clone();
+        let old_without_impersonation = old_buggy_sa_cache.clone();
+
+        // BUG: Both paths are IDENTICAL - tokens would collide!
+        assert_eq!(
+            old_with_impersonation, old_without_impersonation,
+            "BUG: Without fix, impersonated and non-impersonated use SAME cache file"
+        );
+
+        // FIX: The new sa_token_cache_path() produces different paths
+        let fixed_impersonated = sa_token_cache_path(&cache_path, Some("admin@example.com"));
+        let fixed_non_impersonated = sa_token_cache_path(&cache_path, None);
+
+        // FIXED: Paths are different - no more collision
+        assert_ne!(
+            fixed_impersonated, fixed_non_impersonated,
+            "FIXED: Impersonated and non-impersonated now use DIFFERENT cache files"
+        );
+
+        // Verify the fix uses a hash-based filename for impersonation
+        let impersonated_name = fixed_impersonated.file_name().unwrap().to_str().unwrap();
+        assert!(
+            impersonated_name.starts_with("sa_imp_"),
+            "Impersonated cache should have unique prefix, got: {}",
+            impersonated_name
+        );
+    }
+
+    #[test]
+    fn test_sa_token_cache_path_with_impersonation() {
+        let cache_path = std::path::PathBuf::from("/some/path/token_cache.json");
+        let result = sa_token_cache_path(&cache_path, Some("admin@example.com"));
+        let filename = result.file_name().unwrap().to_str().unwrap();
+        assert!(filename.starts_with("sa_imp_"), "Expected sa_imp_ prefix, got: {}", filename);
+        assert!(filename.contains("token_cache.json"), "Expected token_cache.json in filename, got: {}", filename);
+    }
+
+    #[test]
+    fn test_sa_token_cache_path_impersonation_deterministic() {
+        let cache_path = std::path::PathBuf::from("/some/path/token_cache.json");
+        let result1 = sa_token_cache_path(&cache_path, Some("admin@example.com"));
+        let result2 = sa_token_cache_path(&cache_path, Some("admin@example.com"));
+        assert_eq!(result1, result2, "Same email should produce same cache path");
+    }
+
+    #[test]
+    fn test_sa_token_cache_path_different_emails_different_paths() {
+        let cache_path = std::path::PathBuf::from("/some/path/token_cache.json");
+        let result1 = sa_token_cache_path(&cache_path, Some("user1@example.com"));
+        let result2 = sa_token_cache_path(&cache_path, Some("user2@example.com"));
+        assert_ne!(result1, result2, "Different emails should produce different cache paths");
+    }
+
+    #[test]
+    fn test_sa_token_cache_path_preserves_parent_path() {
+        let cache_path = std::path::PathBuf::from("/some/path/token_cache.json");
+        let result = sa_token_cache_path(&cache_path, Some("admin@example.com"));
+        assert_eq!(result.parent().unwrap(), std::path::Path::new("/some/path"));
     }
 }
