@@ -337,6 +337,26 @@ async fn load_credentials_inner(
                         }
                     }
                 }
+                // Clean up any sa_imp_*.json files (hash-based impersonation caches).
+                if let Some(parent) = enc_path.parent() {
+                    if let Ok(mut entries) = tokio::fs::read_dir(parent).await {
+                        while let Some(entry) = entries.next_entry().await.transpose() {
+                            if let Ok(filename) = entry.map(|e| e.file_name().to_string_lossy().to_string()) {
+                                if filename.starts_with("sa_imp_") && filename.ends_with(".json") {
+                                    let path = parent.join(&filename);
+                                    if let Err(err) = tokio::fs::remove_file(&path).await {
+                                        if err.kind() != std::io::ErrorKind::NotFound {
+                                            eprintln!(
+                                                "Warning: failed to remove stale impersonation cache '{}': {err}",
+                                                path.display()
+                                            );
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
                 // Fall through to remaining credential sources below.
             }
         }
