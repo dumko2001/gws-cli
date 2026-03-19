@@ -331,8 +331,9 @@ async fn load_credentials_inner(
                     if let Err(err) = tokio::fs::remove_file(&path).await {
                         if err.kind() != std::io::ErrorKind::NotFound {
                             eprintln!(
-                                "Warning: failed to remove stale token cache '{}': {err}",
-                                path.display()
+                                "Warning: failed to remove stale token cache '{}': {}",
+                                crate::error::sanitize_for_terminal(&path.display().to_string()),
+                                crate::error::sanitize_for_terminal(&err.to_string())
                             );
                         }
                     }
@@ -347,8 +348,9 @@ async fn load_credentials_inner(
                                     if let Err(err) = tokio::fs::remove_file(&path).await {
                                         if err.kind() != std::io::ErrorKind::NotFound {
                                             eprintln!(
-                                                "Warning: failed to remove stale impersonation cache '{}': {err}",
-                                                path.display()
+                                                "Warning: failed to remove stale impersonation cache '{}': {}",
+                                                crate::error::sanitize_for_terminal(&path.display().to_string()),
+                                                crate::error::sanitize_for_terminal(&err.to_string())
                                             );
                                         }
                                     }
