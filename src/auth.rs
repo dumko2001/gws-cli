@@ -87,9 +87,7 @@ fn sa_token_cache_path(token_cache_path: &std::path::Path, impersonate_user: Opt
         let mut hasher = Sha256::new();
         hasher.update(sub.as_bytes());
         let hash = hasher.finalize();
-        let hash_hex = format!("{:x}{:x}{:x}{:x}{:x}{:x}{:x}{:x}",
-            hash[0], hash[1], hash[2], hash[3],
-            hash[4], hash[5], hash[6], hash[7]);
+        let hash_hex: String = hash.iter().map(|b| format!("{:02x}", b)).collect();
         token_cache_path.with_file_name(format!("sa_imp_{hash_hex}_{tc_filename}"))
     } else {
         token_cache_path.with_file_name(format!("sa_{tc_filename}"))
