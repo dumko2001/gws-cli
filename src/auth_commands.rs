@@ -940,10 +940,14 @@ async fn get_status_access_token(
 
     let creds_json_str = if enc_path.exists() {
         credential_store::load_encrypted().ok()
-    } else if plain_path.exists() {
-        std::fs::read_to_string(&plain_path).ok()
     } else {
         None
+    };
+
+    let creds_json_str = if creds_json_str.is_none() && plain_path.exists() {
+        tokio::fs::read_to_string(&plain_path).await.ok()
+    } else {
+        creds_json_str
     };
 
     let creds_str = creds_json_str?;
@@ -966,18 +970,23 @@ async fn get_status_access_token(
 
     match token_resp {
         Ok(resp) => {
-            if let Ok(token_json) = resp.json::<serde_json::Value>().await {
-                if let Some(access_token) = token_json.get("access_token").and_then(|v| v.as_str()) {
-                    Some(access_token.to_string())
-                } else {
-                    output["token_valid"] = serde_json::json!(false);
-                    if let Some(err) = token_json.get("error_description").and_then(|v| v.as_str()) {
-                        output["token_error"] = serde_json::json!(err);
+            match resp.json::<serde_json::Value>().await {
+                Ok(token_json) => {
+                    if let Some(access_token) = token_json.get("access_token").and_then(|v| v.as_str()) {
+                        Some(access_token.to_string())
+                    } else {
+                        output["token_valid"] = serde_json::json!(false);
+                        if let Some(err) = token_json.get("error_description").and_then(|v| v.as_str()) {
+                            output["token_error"] = serde_json::json!(err);
+                        }
+                        None
                     }
+                }
+                Err(e) => {
+                    output["token_valid"] = serde_json::json!(false);
+                    output["token_error"] = serde_json::json!(format!("Failed to parse token response: {}", e));
                     None
                 }
-            } else {
-                None
             }
         }
         Err(e) => {
