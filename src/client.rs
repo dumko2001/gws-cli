@@ -5,7 +5,6 @@ const MAX_RETRIES: u32 = 3;
 /// or misconfigured server from hanging the process indefinitely.
 const MAX_RETRY_DELAY_SECS: u64 = 60;
 const CONNECT_TIMEOUT_SECS: u64 = 10;
-const REQUEST_TIMEOUT_SECS: u64 = 600;
 
 pub fn build_client() -> Result<reqwest::Client, crate::error::GwsError> {
     let mut headers = HeaderMap::new();
@@ -21,7 +20,6 @@ pub fn build_client() -> Result<reqwest::Client, crate::error::GwsError> {
     reqwest::Client::builder()
         .default_headers(headers)
         .connect_timeout(std::time::Duration::from_secs(CONNECT_TIMEOUT_SECS))
-        .timeout(std::time::Duration::from_secs(REQUEST_TIMEOUT_SECS))
         .build()
         .map_err(|e| {
             crate::error::GwsError::Other(anyhow::anyhow!("Failed to build HTTP client: {e}"))
